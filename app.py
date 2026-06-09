@@ -4,14 +4,14 @@ from agent import run_skywise
 
 def skywise_interface(city: str, preferences: str):
     if not city.strip():
-        return "Lütfen bir şehir adı girin.", "", "", ""
+        return "Lütfen bir şehir adı girin.", "", ""
 
     try:
         result = run_skywise(city.strip(), preferences.strip() or "genel aktiviteler")
     except ValueError as e:
-        return str(e), "", "", ""
+        return str(e), "", ""
     except Exception as e:
-        return f"Bir hata oluştu: {str(e)}", "", "", ""
+        return f"Bir hata oluştu: {str(e)}", "", ""
 
     weather_info = (
         f"📍 {result['city']}, {result['country']}\n"
@@ -35,7 +35,6 @@ def skywise_interface(city: str, preferences: str):
 
 with gr.Blocks(
     title="SkyWise — Hava Durumu Aktivite Asistanı",
-    theme=gr.themes.Soft(),
 ) as demo:
     gr.Markdown(
         """
