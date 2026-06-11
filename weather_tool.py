@@ -1,6 +1,7 @@
 import os
 from collections import Counter
 from datetime import datetime
+from typing import Optional
 
 import requests
 from dotenv import load_dotenv
@@ -12,6 +13,7 @@ BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
 
 _PROVIDER = None
+_LAST_WEATHER: Optional[dict] = None
 
 
 def set_weather_provider(provider):
@@ -20,13 +22,54 @@ def set_weather_provider(provider):
     _PROVIDER = provider
 
 
+def get_last_weather() -> Optional[dict]:
+    """UI katmanı için: bu turda en son çekilen hava durumu (yoksa None)."""
+    return _LAST_WEATHER
+
+
+def clear_last_weather() -> None:
+    global _LAST_WEATHER
+    _LAST_WEATHER = None
+
+
+def _remember(weather: dict) -> dict:
+    global _LAST_WEATHER
+    _LAST_WEATHER = weather
+    return weather
+
+
+def _parse_current(data: dict) -> dict:
+    icon = data["weather"][0].get("icon", "01d")
+    weather = {
+        "city": data["name"],
+        "country": data["sys"]["country"],
+        "temperature": round(data["main"]["temp"], 1),
+        "feels_like": round(data["main"]["feels_like"], 1),
+        "humidity": data["main"]["humidity"],
+        "wind_speed": round(data["wind"]["speed"] * 3.6, 1),  # m/s → km/h
+        "condition": data["weather"][0]["description"],
+        "condition_id": data["weather"][0]["id"],
+        "visibility": data.get("visibility", 10000) // 1000,  # metre → km
+        "icon": icon,
+        "is_night": icon.endswith("n"),
+    }
+
+    weather["is_rainy"] = weather["condition_id"] in range(200, 622)
+    weather["is_stormy"] = weather["condition_id"] in range(200, 300)
+    weather["is_snowy"] = weather["condition_id"] in range(600, 622)
+    weather["is_foggy"] = weather["condition_id"] in range(700, 800)
+    weather["is_clear"] = weather["condition_id"] in range(800, 803)
+
+    return weather
+
+
 def get_weather(city: str) -> dict:
     """
     Given a city name, returns a dict with weather details.
     Raises ValueError if city is not found.
     """
     if _PROVIDER is not None:
-        return _PROVIDER(city)
+        return _remember(_PROVIDER(city))
 
     params = {
         "q": city,
@@ -42,27 +85,28 @@ def get_weather(city: str) -> dict:
     if response.status_code != 200:
         raise ConnectionError(f"Hava durumu verisi alınamadı. HTTP {response.status_code}")
 
-    data = response.json()
+    return _remember(_parse_current(response.json()))
 
-    weather = {
-        "city": data["name"],
-        "country": data["sys"]["country"],
-        "temperature": round(data["main"]["temp"], 1),
-        "feels_like": round(data["main"]["feels_like"], 1),
-        "humidity": data["main"]["humidity"],
-        "wind_speed": round(data["wind"]["speed"] * 3.6, 1),  # m/s → km/h
-        "condition": data["weather"][0]["description"],
-        "condition_id": data["weather"][0]["id"],
-        "visibility": data.get("visibility", 10000) // 1000,  # metre → km
+
+def get_weather_by_coords(lat: float, lon: float) -> dict:
+    """
+    Returns the same schema as get_weather() for the given coordinates.
+    Used only by the UI startup path (geolocation); bypasses the eval provider seam.
+    """
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "appid": WEATHER_API_KEY,
+        "units": "metric",
+        "lang": "tr",
     }
 
-    weather["is_rainy"] = weather["condition_id"] in range(200, 622)
-    weather["is_stormy"] = weather["condition_id"] in range(200, 300)
-    weather["is_snowy"] = weather["condition_id"] in range(600, 622)
-    weather["is_foggy"] = weather["condition_id"] in range(700, 800)
-    weather["is_clear"] = weather["condition_id"] in range(800, 803)
+    response = requests.get(BASE_URL, params=params)
 
-    return weather
+    if response.status_code != 200:
+        raise ConnectionError(f"Hava durumu verisi alınamadı. HTTP {response.status_code}")
+
+    return _remember(_parse_current(response.json()))
 
 
 def get_forecast(city: str, days: int = 3) -> str:

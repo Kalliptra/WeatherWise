@@ -19,307 +19,124 @@ def _safe_jspt(schema, defs=None):
 _gcu.get_type = _safe_get_type
 _gcu._json_schema_to_python_type = _safe_jspt
 
+import os  # noqa: E402
+
 import gradio as gr  # noqa: E402
 
 from agent import chat_skywise  # noqa: E402
-
-
-CUSTOM_CSS = """
-/* ---- Skyline · Clear · editorial warm palette ---- */
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@400;500;600;700;800&display=swap');
-
-:root {
-    --accent: #f59e0b;
-    --accent-2: #d97706;
-    --accent-ink: #3a2410;
-    --glow: rgba(217, 119, 6, 0.32);
-    --ink: #2c1810;
-    --ink-soft: #5a4630;
-    --ink-faint: #8a7560;
-    --ink-ghost: #bfa890;
-    --line: rgba(58, 36, 16, 0.10);
-    --glass: rgba(255, 253, 247, 0.55);
-    --glass-2: rgba(255, 253, 247, 0.78);
-    --glass-line: rgba(255, 255, 255, 0.7);
-    --radius: 18px;
-    --font-serif: 'Cormorant Garamond', Georgia, serif;
-    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    color-scheme: light;
-}
-
-html, body, gradio-app {
-    min-height: 100vh;
-    background:
-        radial-gradient(1100px 600px at 50% -10%, rgba(245, 158, 11, 0.22), transparent 60%),
-        linear-gradient(180deg, #fbf2dc 0%, #f6e3bf 45%, #e8cf9d 100%) fixed !important;
-    color: var(--ink) !important;
-    font-family: var(--font-ui) !important;
-}
-.gradio-container {
-    background: transparent !important;
-    max-width: 1040px !important;
-    margin: 0 auto !important;
-    padding-top: 28px !important;
-}
-.gradio-container .main,
-.gradio-container .wrap,
-.gradio-container .app { background: transparent !important; }
-
-/* ---- Hero (eyebrow + serif headline + lede) ---- */
-.hero {
-    text-align: center;
-    background: transparent !important;
-    padding: 14px 0 22px 0 !important;
-}
-.hero .eyebrow {
-    display: inline-block;
-    font-size: 12px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--accent-2) !important;
-    font-weight: 700;
-    margin-bottom: 14px;
-}
-.hero h1 {
-    font-family: var(--font-serif) !important;
-    font-weight: 400 !important;
-    font-size: 3rem !important;
-    line-height: 1.12 !important;
-    letter-spacing: -0.5px !important;
-    color: var(--ink) !important;
-    max-width: 760px;
-    margin: 0 auto 14px auto !important;
-}
-.hero h1 em, .hero h1 i { color: var(--accent-2) !important; font-style: italic; }
-.hero p {
-    font-size: 17px !important;
-    line-height: 1.55 !important;
-    color: var(--ink-soft) !important;
-    max-width: 600px;
-    margin: 0 auto !important;
-}
-
-/* ---- Surface card (warm glass) ---- */
-.surface-card {
-    background: var(--glass) !important;
-    backdrop-filter: blur(14px) saturate(120%) !important;
-    -webkit-backdrop-filter: blur(14px) saturate(120%) !important;
-    border: 1px solid var(--glass-line) !important;
-    border-radius: var(--radius) !important;
-    box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.6) inset,
-        0 18px 50px rgba(58, 36, 16, 0.12) !important;
-    padding: 22px !important;
-}
-.surface-card,
-.surface-card label,
-.surface-card span,
-.surface-card p { color: var(--ink) !important; }
-.surface-card label {
-    font-size: 11px !important;
-    letter-spacing: 0.14em !important;
-    text-transform: uppercase !important;
-    color: var(--ink-faint) !important;
-    font-weight: 700 !important;
-}
-
-/* ---- Inputs ---- */
-.surface-card textarea,
-.surface-card input,
-textarea, input[type="text"] {
-    background: var(--glass-2) !important;
-    border: 1px solid var(--line) !important;
-    border-radius: 14px !important;
-    color: var(--ink) !important;
-    font-family: var(--font-ui) !important;
-    font-size: 16px !important;
-}
-textarea::placeholder, input::placeholder {
-    color: var(--ink-ghost) !important;
-    font-weight: 500 !important;
-}
-textarea:focus, input:focus {
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18) !important;
-    outline: none !important;
-}
-
-/* ---- Primary button (warm gradient) ---- */
-button.primary,
-.surface-card button.primary {
-    background: linear-gradient(150deg, var(--accent), var(--accent-2)) !important;
-    border: none !important;
-    border-radius: 14px !important;
-    font-family: var(--font-ui) !important;
-    font-weight: 800 !important;
-    font-size: 15px !important;
-    color: var(--accent-ink) !important;
-    padding: 13px 24px !important;
-    box-shadow: 0 10px 28px var(--glow) !important;
-    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
-}
-button.primary:hover,
-.surface-card button.primary:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 14px 32px var(--glow) !important;
-}
-
-/* ---- Secondary buttons ---- */
-.surface-card button:not(.primary) {
-    background: var(--glass-2) !important;
-    border: 1px solid var(--line) !important;
-    color: var(--ink-soft) !important;
-    border-radius: 12px !important;
-    font-weight: 600 !important;
-    transition: border-color 0.15s ease, color 0.15s ease !important;
-}
-.surface-card button:not(.primary):hover {
-    border-color: var(--accent) !important;
-    color: var(--ink) !important;
-}
-
-/* ---- Chat area ---- */
-.chat-area {
-    background: transparent !important;
-    border: none !important;
-}
-.chat-area .message.user,
-.chat-area .message-bubble-border.user {
-    background: linear-gradient(150deg, var(--accent), var(--accent-2)) !important;
-    color: var(--accent-ink) !important;
-    border: none !important;
-    border-radius: 16px 16px 4px 16px !important;
-    font-weight: 600 !important;
-    box-shadow: 0 8px 22px var(--glow) !important;
-}
-.chat-area .message.user p,
-.chat-area .message.user strong { color: var(--accent-ink) !important; }
-.chat-area .message.bot,
-.chat-area .message-bubble-border.bot {
-    background: var(--glass-2) !important;
-    color: var(--ink) !important;
-    border: 1px solid var(--glass-line) !important;
-    border-radius: 16px 16px 16px 4px !important;
-    box-shadow: 0 6px 18px rgba(58, 36, 16, 0.08) !important;
-}
-.chat-area .message.bot p,
-.chat-area .message.bot li,
-.chat-area .message.bot strong,
-.chat-area .message.bot h1,
-.chat-area .message.bot h2,
-.chat-area .message.bot h3 { color: var(--ink) !important; }
-.chat-area .message.bot em { color: var(--accent-2) !important; }
-.chat-area .message.bot a { color: var(--accent-2) !important; font-weight: 600; }
-.chat-area .message.bot code {
-    background: rgba(58, 36, 16, 0.06) !important;
-    color: var(--ink) !important;
-    border: 1px solid var(--line) !important;
-    border-radius: 6px !important;
-    padding: 1px 6px !important;
-    font-size: 0.9em;
-}
-.chat-input-row { margin-top: 14px !important; }
-
-/* ---- Examples chips (glass pills) ---- */
-.surface-card .examples,
-.surface-card [class*="examples"] button,
-.surface-card .gradio-examples button {
-    background: var(--glass) !important;
-    border: 1px solid var(--glass-line) !important;
-    color: var(--ink-soft) !important;
-    border-radius: 999px !important;
-    font-weight: 600 !important;
-    font-size: 13.5px !important;
-    padding: 8px 15px !important;
-    transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease !important;
-}
-.surface-card .examples button:hover,
-.surface-card [class*="examples"] button:hover {
-    border-color: var(--accent) !important;
-    color: var(--ink) !important;
-    transform: translateY(-1px);
-}
-.surface-card [class*="examples"] > label,
-.surface-card .gradio-examples > label {
-    color: var(--ink-faint) !important;
-    font-size: 11px !important;
-    letter-spacing: 0.14em !important;
-    text-transform: uppercase !important;
-    font-weight: 700 !important;
-}
-
-/* ---- Scrollbar ---- */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(58, 36, 16, 0.18); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent-2); }
-
-/* ---- Footer ---- */
-.footer-note {
-    text-align: center;
-    background: transparent !important;
-    margin-top: 22px;
-    padding-top: 14px;
-    border-top: 1px solid var(--line);
-}
-.footer-note p,
-.footer-note strong { color: var(--ink-faint) !important; font-weight: 600 !important; }
-"""
-
-
-HOSGELDIN_MESAJI = (
-    "Merhaba! 👋 Ben **SkyWise** — hava durumuna göre aktivite öneren asistanın.\n\n"
-    "Hangi şehirde olduğunu ve nasıl bir aktivite aradığını söyle, sana özel "
-    "öneriler hazırlayayım. Sonradan istediğin gibi sorularla detaylandırabilirsin "
-    "— örneğin _\"o ilk kafe hakkında biraz daha bilgi?\"_ veya _\"müze sevmiyorum, "
-    "başka ne yapabilirim?\"_ gibi."
+from ui_theme import (  # noqa: E402
+    CUSTOM_CSS,
+    render_panel_placeholder,
+    render_weather_panel,
+    weather_to_theme,
+)
+from weather_tool import (  # noqa: E402
+    clear_last_weather,
+    get_last_weather,
+    get_weather,
+    get_weather_by_coords,
 )
 
+DEFAULT_CITY = os.getenv("DEFAULT_CITY", "Istanbul")
 
-def _initial_history() -> list[dict]:
-    return [{"role": "assistant", "content": HOSGELDIN_MESAJI}]
+ORNEK_SORULAR = [
+    "Bugün İstanbul'da hava nasıl, ne yapabilirim?",
+    "Ankara'da iç mekân aktiviteleri öner",
+    "Antalya'da plaj ve yüzme için bugün uygun mu?",
+    "Eskişehir'de bu hafta sonu için müze önerin var mı?",
+]
+
+KARSILAMA_HTML = """
+<div class="greeting">
+    <div class="wave">👋</div>
+    <h2>Merhaba! Ben SkyWise</h2>
+    <p>Hava durumuna göre aktivite öneren asistanın. Hangi şehirde olduğunu
+    ve nasıl bir aktivite aradığını söyle, sana özel öneriler hazırlayayım.</p>
+</div>
+"""
+
+GEO_JS = """
+async () => {
+    try {
+        const pos = await new Promise((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                timeout: 6000,
+                maximumAge: 600000,
+            })
+        );
+        return pos.coords.latitude.toFixed(4) + "," + pos.coords.longitude.toFixed(4);
+    } catch (e) {
+        return "";
+    }
+}
+"""
+
+THEME_JS = "(t) => { document.body.dataset.theme = t || 'clear-day'; }"
 
 
 def respond(user_message: str, history: list[dict]):
+    """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state)."""
     user_message = (user_message or "").strip()
     if not user_message:
-        yield history, ""
+        yield gr.update(), "", gr.update(), gr.update(), gr.update()
         return
 
     history = list(history or [])
     history.append({"role": "user", "content": user_message})
     history.append({"role": "assistant", "content": ""})
 
+    # Kullanıcı mesajı anında görünsün; boş durum kartları kaybolsun
+    yield gr.update(value=history, visible=True), "", gr.update(visible=False), gr.update(), gr.update()
+
     convo_for_agent = history[:-1]
+    clear_last_weather()
+    panel_sent = False
 
     try:
         for partial in chat_skywise(convo_for_agent):
             history[-1]["content"] = partial
-            yield history, ""
+            weather = get_last_weather()
+            if weather is not None and not panel_sent:
+                panel_sent = True
+                yield history, "", gr.update(), render_weather_panel(weather), weather_to_theme(weather)
+            else:
+                yield history, "", gr.update(), gr.update(), gr.update()
     except ValueError as e:
         history[-1]["content"] = f"> ⚠️ {e}"
-        yield history, ""
+        yield history, "", gr.update(), gr.update(), gr.update()
     except Exception as e:
         history[-1]["content"] = f"> ⚠️ Bir hata oluştu: {e}"
-        yield history, ""
+        yield history, "", gr.update(), gr.update(), gr.update()
+
+
+def clear_chat():
+    return gr.update(value=[], visible=False), gr.update(visible=True), ""
+
+
+def load_default_city():
+    try:
+        weather = get_weather(DEFAULT_CITY)
+        return render_weather_panel(weather), weather_to_theme(weather)
+    except Exception:
+        return render_panel_placeholder("Hava durumu alınamadı."), "clear-day"
+
+
+def apply_geolocation(coords: str):
+    try:
+        lat, lon = (float(x) for x in (coords or "").split(","))
+        weather = get_weather_by_coords(lat, lon)
+        return render_weather_panel(weather), weather_to_theme(weather)
+    except Exception:
+        # Konum reddedildi/alınamadı → varsayılan şehir zaten ekranda
+        return gr.update(), gr.update()
 
 
 with gr.Blocks(
     title="SkyWise — Hava Durumu Aktivite Asistanı",
     theme=gr.themes.Base(
-        primary_hue="amber",
-        neutral_hue="stone",
+        primary_hue="blue",
+        neutral_hue="slate",
         font=gr.themes.GoogleFont("Inter"),
-    ).set(
-        body_background_fill="#fbf2dc",
-        body_text_color="#2c1810",
-        background_fill_primary="rgba(255,253,247,0.78)",
-        background_fill_secondary="rgba(255,253,247,0.55)",
-        border_color_primary="rgba(58,36,16,0.10)",
-        block_background_fill="rgba(255,253,247,0.55)",
-        block_border_color="rgba(255,255,255,0.7)",
-        input_background_fill="rgba(255,253,247,0.78)",
-        input_border_color="rgba(58,36,16,0.10)",
     ),
     css=CUSTOM_CSS,
 ) as demo:
@@ -327,46 +144,49 @@ with gr.Blocks(
         """
         <div class="hero">
             <div class="eyebrow">Hava Durumu Aktivite Asistanı</div>
-            <h1>Bugün hava <em>ne yapmaya</em> uygun?</h1>
-            <p>Şehrini yaz, dilersen ilgi alanlarını ekle — bugünün havasına en uygun aktiviteleri anında öner.</p>
+            <h1>SkyWise</h1>
+            <p>Şehrini yaz, bugünün havasına en uygun aktiviteleri anında öner.</p>
         </div>
         """,
     )
 
-    with gr.Column(elem_classes="surface-card"):
-        chatbot = gr.Chatbot(
-            value=_initial_history(),
-            type="messages",
-            height=520,
-            elem_classes="chat-area",
-            show_copy_button=True,
-            avatar_images=(None, None),
-            label="SkyWise Sohbet",
-        )
+    with gr.Row(elem_classes="main-row"):
+        with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
+            weather_panel = gr.HTML(render_panel_placeholder("Hava durumu yükleniyor..."))
 
-        with gr.Row(elem_classes="chat-input-row"):
-            textbox = gr.Textbox(
-                placeholder="Mesajını yaz... (örn: \"Bugün İstanbul'da ne yapsam?\")",
-                scale=9,
-                container=False,
-                lines=1,
+        with gr.Column(scale=5, elem_classes="chat-surface"):
+            with gr.Column(visible=True, elem_classes="empty-state") as empty_state:
+                gr.HTML(KARSILAMA_HTML)
+                with gr.Row():
+                    sug1 = gr.Button(ORNEK_SORULAR[0], elem_classes="suggestion-btn")
+                    sug2 = gr.Button(ORNEK_SORULAR[1], elem_classes="suggestion-btn")
+                with gr.Row():
+                    sug3 = gr.Button(ORNEK_SORULAR[2], elem_classes="suggestion-btn")
+                    sug4 = gr.Button(ORNEK_SORULAR[3], elem_classes="suggestion-btn")
+
+            chatbot = gr.Chatbot(
+                value=[],
+                visible=False,
+                type="messages",
+                height=520,
+                elem_classes="chat-area",
+                show_copy_button=True,
                 show_label=False,
+                avatar_images=(None, None),
             )
-            send_btn = gr.Button("Gönder ↗", variant="primary", scale=1)
 
-        with gr.Row():
-            clear_btn = gr.Button("🗑 Sohbeti Temizle", size="sm")
+            with gr.Row(elem_classes="chat-input-row"):
+                textbox = gr.Textbox(
+                    placeholder="Mesajını yaz... (örn: \"Bugün İstanbul'da ne yapsam?\")",
+                    scale=9,
+                    container=False,
+                    lines=1,
+                    show_label=False,
+                )
+                send_btn = gr.Button("Gönder ↗", variant="primary", scale=1)
 
-        gr.Examples(
-            examples=[
-                "Bugün İstanbul'da hava nasıl, ne yapabilirim?",
-                "Ankara'da iç mekân aktiviteleri öner",
-                "Antalya'da plaj ve yüzme için bugün uygun mu?",
-                "Eskişehir'de bu hafta sonu için müze önerin var mı?",
-            ],
-            inputs=textbox,
-            label="Örnek sorular",
-        )
+            with gr.Row():
+                clear_btn = gr.Button("🗑 Sohbeti Temizle", size="sm")
 
     gr.Markdown(
         """
@@ -376,9 +196,22 @@ with gr.Blocks(
         elem_classes="footer-note",
     )
 
-    textbox.submit(respond, [textbox, chatbot], [chatbot, textbox], api_name=False)
-    send_btn.click(respond, [textbox, chatbot], [chatbot, textbox], api_name=False)
-    clear_btn.click(lambda: _initial_history(), None, chatbot, api_name=False)
+    theme_state = gr.Textbox(visible=False, elem_id="theme-state")
+    geo_coords = gr.Textbox(visible=False, elem_id="geo-coords")
+
+    OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state]
+
+    textbox.submit(respond, [textbox, chatbot], OUTPUTS, api_name=False)
+    send_btn.click(respond, [textbox, chatbot], OUTPUTS, api_name=False)
+    for sug in (sug1, sug2, sug3, sug4):
+        sug.click(respond, [sug, chatbot], OUTPUTS, api_name=False)
+    clear_btn.click(clear_chat, None, [chatbot, empty_state, textbox], api_name=False)
+
+    theme_state.change(None, theme_state, None, js=THEME_JS, api_name=False)
+
+    demo.load(load_default_city, None, [weather_panel, theme_state], api_name=False)
+    demo.load(None, None, geo_coords, js=GEO_JS, api_name=False)
+    geo_coords.change(apply_geolocation, geo_coords, [weather_panel, theme_state], api_name=False)
 
 
 if __name__ == "__main__":

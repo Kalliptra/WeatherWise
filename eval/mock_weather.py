@@ -14,7 +14,9 @@ def _materialize(override: dict) -> dict:
         "condition": override.get("condition", ""),
         "condition_id": int(cid),
         "visibility": int(override.get("visibility", 10)),
+        "icon": override.get("icon", "01d"),
     }
+    base["is_night"] = base["icon"].endswith("n")
     base["is_rainy"] = 200 <= cid < 622
     base["is_stormy"] = 200 <= cid < 300
     base["is_snowy"] = 600 <= cid < 622
