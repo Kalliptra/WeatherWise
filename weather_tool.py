@@ -11,12 +11,23 @@ WEATHER_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")
 BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
 
+_PROVIDER = None
+
+
+def set_weather_provider(provider):
+    """Eval framework için DI seam: callable(city) -> get_weather() şemasında dict."""
+    global _PROVIDER
+    _PROVIDER = provider
+
 
 def get_weather(city: str) -> dict:
     """
     Given a city name, returns a dict with weather details.
     Raises ValueError if city is not found.
     """
+    if _PROVIDER is not None:
+        return _PROVIDER(city)
+
     params = {
         "q": city,
         "appid": WEATHER_API_KEY,

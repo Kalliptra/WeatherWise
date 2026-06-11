@@ -1,0 +1,410 @@
+[
+  {
+    "id": "S01",
+    "city": "Antalya",
+    "preferences": "yüzme, plaj, snorkel",
+    "tags": ["hot_humid", "summer", "outdoor_water"],
+    "weather_override": {
+      "city": "Antalya", "country": "TR",
+      "temperature": 35.0, "feels_like": 41.0,
+      "humidity": 75, "wind_speed": 8.0,
+      "condition": "açık", "condition_id": 800, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_strenuous", "weight": 1.0},
+      {"type": "must_personalize_to", "values": ["plaj", "yüzme", "deniz", "snorkel"], "weight": 1.0},
+      {"type": "must_mention_keyword_any", "values": ["güneş", "sıvı", "su tüketimi", "şapka", "gölge"], "weight": 0.5}
+    ],
+    "judge_focus": "Heat safety messaging plus alignment with water-based preferences"
+  },
+  {
+    "id": "S02",
+    "city": "Şanlıurfa",
+    "preferences": "",
+    "tags": ["extreme_heat", "no_prefs", "edge_case"],
+    "weather_override": {
+      "city": "Şanlıurfa", "country": "TR",
+      "temperature": 38.0, "feels_like": 44.0,
+      "humidity": 30, "wind_speed": 12.0,
+      "condition": "açık", "condition_id": 800, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_strenuous", "weight": 1.0},
+      {"type": "must_include_indoor_alternative", "weight": 1.0}
+    ],
+    "judge_focus": "Extreme heat with no preferences: general safety + indoor suggestions"
+  },
+  {
+    "id": "S03",
+    "city": "Adana",
+    "preferences": "çocuklarla aile aktivitesi",
+    "tags": ["hot", "family", "summer"],
+    "weather_override": {
+      "city": "Adana", "country": "TR",
+      "temperature": 36.0, "feels_like": 39.0,
+      "humidity": 65, "wind_speed": 6.0,
+      "condition": "az bulutlu", "condition_id": 801, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_strenuous", "weight": 1.0},
+      {"type": "must_personalize_to", "values": ["aile", "çocuk", "park"], "weight": 1.0}
+    ],
+    "judge_focus": "Family-friendly recs that respect heat safety"
+  },
+  {
+    "id": "S04",
+    "city": "Bodrum",
+    "preferences": "fotoğrafçılık, manzara",
+    "tags": ["hot", "photography"],
+    "weather_override": {
+      "city": "Bodrum", "country": "TR",
+      "temperature": 32.0, "feels_like": 35.0,
+      "humidity": 55, "wind_speed": 18.0,
+      "condition": "açık", "condition_id": 800, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_personalize_to", "values": ["fotoğraf", "manzara", "günbatımı", "sahil"], "weight": 1.0},
+      {"type": "must_mention_keyword_any", "values": ["altın saat", "günbatımı", "sabah", "güneş"], "weight": 0.5}
+    ],
+    "judge_focus": "Photography-friendly outdoor recs with light/time guidance"
+  },
+  {
+    "id": "S05",
+    "city": "Gaziantep",
+    "preferences": "yemek, lezzet turu",
+    "tags": ["ideal_mild", "food", "culture"],
+    "weather_override": {
+      "city": "Gaziantep", "country": "TR",
+      "temperature": 22.0, "feels_like": 22.0,
+      "humidity": 50, "wind_speed": 8.0,
+      "condition": "parçalı bulutlu", "condition_id": 802, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_personalize_to", "values": ["yemek", "lezzet", "baklava", "kebap", "restoran"], "weight": 1.0}
+    ],
+    "judge_focus": "Food-tour recs grounded in Gaziantep cuisine"
+  },
+  {
+    "id": "S06",
+    "city": "Erzurum",
+    "preferences": "spor, doğa",
+    "tags": ["freezing", "winter", "outdoor_sport_conflict"],
+    "weather_override": {
+      "city": "Erzurum", "country": "TR",
+      "temperature": -5.0, "feels_like": -12.0,
+      "humidity": 70, "wind_speed": 25.0,
+      "condition": "hafif kar yağışı", "condition_id": 600, "visibility": 6
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_outdoor", "weight": 1.0},
+      {"type": "must_include_indoor_alternative", "weight": 1.0},
+      {"type": "must_mention_keyword_any", "values": ["kayak", "termal", "iç mekan", "spor salonu"], "weight": 0.5}
+    ],
+    "judge_focus": "Cold-weather safety + indoor or winter-sport substitutes"
+  },
+  {
+    "id": "S07",
+    "city": "Kars",
+    "preferences": "kültür, müze",
+    "tags": ["very_cold", "culture"],
+    "weather_override": {
+      "city": "Kars", "country": "TR",
+      "temperature": -10.0, "feels_like": -18.0,
+      "humidity": 65, "wind_speed": 22.0,
+      "condition": "kapalı", "condition_id": 804, "visibility": 8
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_outdoor", "weight": 1.0},
+      {"type": "must_personalize_to", "values": ["müze", "kültür", "tarihi"], "weight": 1.0}
+    ],
+    "judge_focus": "Sub-zero refusal of outdoor + culture grounded indoor recs"
+  },
+  {
+    "id": "S08",
+    "city": "Kars",
+    "preferences": "gece fotoğrafçılığı, yıldız",
+    "tags": ["very_cold", "night_photography", "contradictory"],
+    "weather_override": {
+      "city": "Kars", "country": "TR",
+      "temperature": -8.0, "feels_like": -15.0,
+      "humidity": 60, "wind_speed": 10.0,
+      "condition": "açık", "condition_id": 800, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_mention_keyword_any", "values": ["sıcak tut", "katmanlı", "kıyafet", "soğuk", "termal"], "weight": 1.0},
+      {"type": "must_personalize_to", "values": ["fotoğraf", "yıldız", "gece"], "weight": 1.0}
+    ],
+    "judge_focus": "Night photo possible but requires explicit cold-safety messaging"
+  },
+  {
+    "id": "S09",
+    "city": "Uludağ",
+    "preferences": "manzara, kar",
+    "tags": ["snow", "viewpoint"],
+    "weather_override": {
+      "city": "Uludağ", "country": "TR",
+      "temperature": -2.0, "feels_like": -8.0,
+      "humidity": 80, "wind_speed": 18.0,
+      "condition": "kar yağışlı", "condition_id": 601, "visibility": 4
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_outdoor", "weight": 1.0},
+      {"type": "must_personalize_to", "values": ["kar", "manzara", "kayak"], "weight": 1.0}
+    ],
+    "judge_focus": "Snowstorm: refuse generic outdoor, lean on winter-specific activities"
+  },
+  {
+    "id": "S10",
+    "city": "Ankara",
+    "preferences": "yürüyüş",
+    "tags": ["boundary_freezing", "edge_case"],
+    "weather_override": {
+      "city": "Ankara", "country": "TR",
+      "temperature": 0.0, "feels_like": -3.0,
+      "humidity": 75, "wind_speed": 12.0,
+      "condition": "kapalı", "condition_id": 804, "visibility": 8
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_outdoor", "weight": 1.0},
+      {"type": "must_include_indoor_alternative", "weight": 1.0}
+    ],
+    "judge_focus": "0°C boundary should still trigger the no-outdoor-sport rule"
+  },
+  {
+    "id": "S11",
+    "city": "Trabzon",
+    "preferences": "doğa yürüyüşü, dağ bisikleti",
+    "tags": ["storm", "contradictory_prefs", "outdoor_sport"],
+    "weather_override": {
+      "city": "Trabzon", "country": "TR",
+      "temperature": 14.0, "feels_like": 13.0,
+      "humidity": 88, "wind_speed": 42.0,
+      "condition": "şiddetli gök gürültülü sağanak", "condition_id": 211, "visibility": 3
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_outdoor", "weight": 1.0},
+      {"type": "must_include_indoor_alternative", "weight": 1.0},
+      {"type": "must_mention_keyword_any", "values": ["fırtına", "yağmur", "güvenli", "tehlikeli"], "weight": 0.5}
+    ],
+    "judge_focus": "Stormy + outdoor preferences: refuse + alternatives"
+  },
+  {
+    "id": "S12",
+    "city": "Rize",
+    "preferences": "turistik gezi, çay",
+    "tags": ["heavy_rain", "tourism"],
+    "weather_override": {
+      "city": "Rize", "country": "TR",
+      "temperature": 16.0, "feels_like": 16.0,
+      "humidity": 90, "wind_speed": 12.0,
+      "condition": "şiddetli yağmur", "condition_id": 502, "visibility": 5
+    },
+    "expected_constraints": [
+      {"type": "must_include_indoor_alternative", "weight": 1.0},
+      {"type": "must_personalize_to", "values": ["çay", "müze", "turistik"], "weight": 1.0}
+    ],
+    "judge_focus": "Heavy rain: indoor alternatives that still match tourism interest"
+  },
+  {
+    "id": "S13",
+    "city": "İstanbul",
+    "preferences": "kafe, sohbet",
+    "tags": ["drizzle", "cafe"],
+    "weather_override": {
+      "city": "İstanbul", "country": "TR",
+      "temperature": 13.0, "feels_like": 12.0,
+      "humidity": 80, "wind_speed": 14.0,
+      "condition": "hafif yağmur", "condition_id": 500, "visibility": 8
+    },
+    "expected_constraints": [
+      {"type": "must_personalize_to", "values": ["kafe", "kahve"], "weight": 1.0},
+      {"type": "must_include_indoor_alternative", "weight": 1.0}
+    ],
+    "judge_focus": "Light drizzle: cafe-centric indoor recs"
+  },
+  {
+    "id": "S14",
+    "city": "Eskişehir",
+    "preferences": "müze, kafe",
+    "tags": ["ideal_mild", "culture", "venue_grounding"],
+    "weather_override": {
+      "city": "Eskişehir", "country": "TR",
+      "temperature": 19.0, "feels_like": 19.0,
+      "humidity": 55, "wind_speed": 10.0,
+      "condition": "parçalı bulutlu", "condition_id": 802, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_personalize_to", "values": ["müze", "kafe"], "weight": 1.0}
+    ],
+    "judge_focus": "Mild + culture preference: venue-grounded suggestions"
+  },
+  {
+    "id": "S15",
+    "city": "Ankara",
+    "preferences": "spor, koşu",
+    "tags": ["ideal_spring", "sport"],
+    "weather_override": {
+      "city": "Ankara", "country": "TR",
+      "temperature": 18.0, "feels_like": 18.0,
+      "humidity": 45, "wind_speed": 12.0,
+      "condition": "az bulutlu", "condition_id": 801, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_personalize_to", "values": ["koşu", "spor", "park"], "weight": 1.0}
+    ],
+    "judge_focus": "Ideal spring weather: sport-friendly outdoor recs allowed"
+  },
+  {
+    "id": "S16",
+    "city": "İstanbul",
+    "preferences": "müze, kafe, park",
+    "tags": ["ideal_mild", "multi_category"],
+    "weather_override": {
+      "city": "İstanbul", "country": "TR",
+      "temperature": 21.0, "feels_like": 21.0,
+      "humidity": 50, "wind_speed": 10.0,
+      "condition": "parçalı bulutlu", "condition_id": 802, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_personalize_to", "values": ["müze", "kafe", "park"], "weight": 1.0}
+    ],
+    "judge_focus": "Mild + 3 categories: balanced multi-rec coverage"
+  },
+  {
+    "id": "S17",
+    "city": "Çanakkale",
+    "preferences": "yemek, deniz manzarası",
+    "tags": ["windy", "food"],
+    "weather_override": {
+      "city": "Çanakkale", "country": "TR",
+      "temperature": 20.0, "feels_like": 18.0,
+      "humidity": 60, "wind_speed": 35.0,
+      "condition": "açık", "condition_id": 800, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_personalize_to", "values": ["yemek", "balık", "deniz", "restoran"], "weight": 1.0},
+      {"type": "must_mention_keyword_any", "values": ["rüzgar", "rüzgarlı"], "weight": 0.5}
+    ],
+    "judge_focus": "Strong wind: acknowledged but mild temp allows seaside food recs"
+  },
+  {
+    "id": "S18",
+    "city": "Bursa",
+    "preferences": "fotoğrafçılık",
+    "tags": ["fog", "photography"],
+    "weather_override": {
+      "city": "Bursa", "country": "TR",
+      "temperature": 8.0, "feels_like": 7.0,
+      "humidity": 95, "wind_speed": 4.0,
+      "condition": "sis", "condition_id": 741, "visibility": 1
+    },
+    "expected_constraints": [
+      {"type": "must_personalize_to", "values": ["fotoğraf", "sis", "atmosfer"], "weight": 1.0},
+      {"type": "must_mention_keyword_any", "values": ["dikkat", "görüş", "güvenli"], "weight": 0.5}
+    ],
+    "judge_focus": "Fog + photo: mood-photography ok with visibility caveats"
+  },
+  {
+    "id": "S19",
+    "city": "İzmir",
+    "preferences": "açık hava",
+    "tags": ["high_wind", "ideal_temp"],
+    "weather_override": {
+      "city": "İzmir", "country": "TR",
+      "temperature": 24.0, "feels_like": 23.0,
+      "humidity": 50, "wind_speed": 45.0,
+      "condition": "açık", "condition_id": 800, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_mention_keyword_any", "values": ["rüzgar", "rüzgarlı"], "weight": 1.0}
+    ],
+    "judge_focus": "Strong wind despite ideal temp: must be acknowledged"
+  },
+  {
+    "id": "S20",
+    "city": "İzmit",
+    "preferences": "sadece iç mekan, plaj",
+    "tags": ["humid", "contradictory_prefs"],
+    "weather_override": {
+      "city": "İzmit", "country": "TR",
+      "temperature": 28.0, "feels_like": 32.0,
+      "humidity": 85, "wind_speed": 8.0,
+      "condition": "az bulutlu", "condition_id": 801, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_include_indoor_alternative", "weight": 1.0}
+    ],
+    "judge_focus": "Contradictory prefs (indoor only + beach): honor indoor primarily"
+  },
+  {
+    "id": "S21",
+    "city": "Mersin",
+    "preferences": "spor",
+    "tags": ["boundary_extreme_heat", "edge_case"],
+    "weather_override": {
+      "city": "Mersin", "country": "TR",
+      "temperature": 38.0, "feels_like": 44.0,
+      "humidity": 70, "wind_speed": 6.0,
+      "condition": "açık", "condition_id": 800, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_strenuous", "weight": 1.0},
+      {"type": "must_include_indoor_alternative", "weight": 1.0}
+    ],
+    "judge_focus": "38°C exact boundary should trigger no-strenuous-activity rule"
+  },
+  {
+    "id": "S22",
+    "city": "Sivas",
+    "preferences": "doğa",
+    "tags": ["boundary_zero", "edge_case"],
+    "weather_override": {
+      "city": "Sivas", "country": "TR",
+      "temperature": 0.0, "feels_like": -4.0,
+      "humidity": 80, "wind_speed": 8.0,
+      "condition": "kapalı", "condition_id": 804, "visibility": 7
+    },
+    "expected_constraints": [
+      {"type": "must_not_recommend_outdoor", "weight": 1.0}
+    ],
+    "judge_focus": "0°C boundary: no outdoor sport rule applies"
+  },
+  {
+    "id": "S23",
+    "city": "Konya",
+    "preferences": "",
+    "tags": ["ideal_mild", "empty_prefs"],
+    "weather_override": {
+      "city": "Konya", "country": "TR",
+      "temperature": 17.0, "feels_like": 17.0,
+      "humidity": 45, "wind_speed": 9.0,
+      "condition": "açık", "condition_id": 800, "visibility": 10
+    },
+    "expected_constraints": [
+      {"type": "must_mention_keyword_any", "values": ["aktivite", "öneri", "park", "tarihi", "müze"], "weight": 1.0}
+    ],
+    "judge_focus": "Empty prefs: gracefully default to general recs"
+  },
+  {
+    "id": "S24",
+    "city": "asdkjhasdkjh",
+    "preferences": "",
+    "tags": ["invalid_city", "edge_case", "empty_prefs"],
+    "weather_override": null,
+    "expected_constraints": [
+      {"type": "must_handle_invalid_city_gracefully", "weight": 1.0}
+    ],
+    "judge_focus": "Graceful Turkish error handling without hallucinated weather"
+  },
+  {
+    "id": "S25",
+    "city": "İstanbul",
+    "preferences": "kafe, müze",
+    "tags": ["smoke_real_api"],
+    "weather_override": null,
+    "expected_constraints": [
+      {"type": "must_personalize_to", "values": ["kafe", "müze"], "weight": 1.0}
+    ],
+    "judge_focus": "End-to-end smoke run against real OWM + OSM"
+  }
+]

@@ -147,6 +147,8 @@ def skywise_interface(city: str, preferences: str):
 
 with gr.Blocks(
     title="SkyWise — Hava Durumu Aktivite Asistanı",
+    theme=gr.themes.Soft(primary_hue="sky", neutral_hue="slate"),
+    css=CUSTOM_CSS,
 ) as demo:
     gr.Markdown(
         """
@@ -207,8 +209,4 @@ with gr.Blocks(
 
 
 if __name__ == "__main__":
-    demo.launch(
-        show_error=True,
-        theme=gr.themes.Soft(primary_hue="sky", neutral_hue="slate"),
-        css=CUSTOM_CSS,
-    )
+    demo.launch(show_error=True)
