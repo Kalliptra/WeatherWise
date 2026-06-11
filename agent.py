@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import os
+import time
+from collections.abc import Iterator
 from operator import add
 from typing import Annotated, Literal, Optional, TypedDict
 
 from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
+from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field
 
 from venue_tool import find_venues, format_venues_for_llm
@@ -100,6 +103,41 @@ SKOR: [1-10]
 YORUM: [max 2 cümle değerlendirme]
 DÜZELTİLMİŞ_ÖNERİ: [HAYIR ise düzeltilmiş versiyon, EVET ise "Öneri uygundur."]
 """
+
+CHAT_SYSTEM_PROMPT = """Sen SkyWise — hava durumuna göre aktivite öneren, Türkçe
+konuşan modern bir AI asistansın. Kullanıcıyla doğal bir sohbet kurarsın.
+
+Konuşma akışı:
+- Şehir bilgisi yoksa kibarca sor (örn: "Hangi şehirde olduğunu söyler misin?").
+- Tercih belirsizse 2-3 örnekle yönlendir
+  ("Doğa yürüyüşü mü, kafe takılması mı, yoksa müze gezmek mi ilgini çeker?").
+- Yeterli bilgi olduğunda doğrudan öneriye geç; tekrar tekrar onay isteme.
+- Kullanıcı follow-up soru sorarsa (örn: "ilk önerdiğin kafe hakkında daha fazla
+  bilgi"), önceki turda topladığın bilgiyi kullan — aynı şehir için tool'ları
+  tekrar tekrar çağırma.
+
+Araç kullanımı:
+- current_weather: bir şehirde ilk kez öneri üretmeden önce ÇAĞIR.
+- venue_search: kullanıcının ilgilendiği her ana aktivite kategorisi için
+  ayrı ayrı çağır (kategoriler: müze, park, kafe, restoran, spor salonu,
+  manzara, kütüphane, sanat galerisi, alışveriş, plaj, sinema, doğa yürüyüşü).
+- forecast: sadece kullanıcı "yarın", "hafta sonu", "önümüzdeki günler" gibi
+  ileri tarihten bahsederse çağır.
+- comfort: hava sınırda (sıcak+nemli veya soğuk+rüzgarlı) ve kullanıcı dış
+  mekan istiyorsa çağır.
+- Aynı bilgi için aynı tool'u aynı argümanlarla iki kez ÇAĞIRMA.
+
+Güvenlik kuralları (mutlak):
+- Fırtına veya şiddetli yağışta açık hava aktivitesi ÖNERME, iç mekan alternatifi sun.
+- Sıcaklık 0°C altında açık hava sporu ÖNERME.
+- Sıcaklık 38°C üzerinde yoğun fiziksel aktivite ÖNERME.
+
+Cevap stili:
+- Türkçe, samimi, kısa. Öneriler 1-2 cümle gerekçe içersin.
+- venue_search çıktısındaki gerçek mekân isimlerini kullan — uydurma isim verme.
+- Öneri turunda 3-5 somut aktivite ver; follow-up'larda kullanıcının sorduğu
+  spesifik konuya odaklan, listeyi tekrarlama.
+- Kısa hava özetiyle başla (sıcaklık + kondisyon), sonra önerilere geç."""
 
 
 # ---- LangChain tools (inspectability için tutulur; StateGraph dispatch ile çalışır) ----
@@ -453,6 +491,134 @@ def run_skywise_traced(city: str, preferences: str) -> dict:
             "venues": {},
         }
     )
+
+
+# ---- Chat layer (worker ReAct agent + supervisor gate) ----
+
+_RECOMMENDATION_TOOLS = {"current_weather_tool", "venue_search_tool"}
+
+_chat_worker = create_react_agent(
+    react_llm,
+    tools=[current_weather_tool, forecast_tool, comfort_tool, venue_search_tool],
+)
+
+
+def _gradio_to_lc_messages(messages: list[dict]) -> list:
+    lc: list = [SystemMessage(content=CHAT_SYSTEM_PROMPT)]
+    for m in messages:
+        role = m.get("role")
+        content = (m.get("content") or "").strip()
+        if not content:
+            continue
+        if role == "user":
+            lc.append(HumanMessage(content=content))
+        elif role == "assistant":
+            lc.append(AIMessage(content=content))
+    return lc
+
+
+def _turn_produced_recommendation(new_messages: list) -> bool:
+    for m in new_messages:
+        if isinstance(m, AIMessage):
+            for call in getattr(m, "tool_calls", None) or []:
+                name = call.get("name") if isinstance(call, dict) else getattr(call, "name", "")
+                if name in _RECOMMENDATION_TOOLS:
+                    return True
+        elif isinstance(m, ToolMessage):
+            if getattr(m, "name", "") in _RECOMMENDATION_TOOLS:
+                return True
+    return False
+
+
+def _last_user_text(messages: list[dict]) -> str:
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            return (m.get("content") or "").strip()
+    return ""
+
+
+def _supervise_chat_turn(
+    worker_text: str, new_messages: list, original_messages: list[dict]
+) -> str:
+    tool_outputs: list[str] = []
+    for m in new_messages:
+        if isinstance(m, ToolMessage):
+            tool_outputs.append(f"[{m.name}]\n{m.content}")
+
+    user_block = _last_user_text(original_messages) or "(kullanıcı mesajı yok)"
+    context_block = "\n\n".join(tool_outputs) or "yok"
+
+    raw = evaluator_llm.invoke(
+        [
+            SystemMessage(content=SUPERVISOR_SYSTEM_PROMPT),
+            HumanMessage(
+                content=(
+                    f"Kullanıcı son mesajı:\n{user_block}\n\n"
+                    f"Worker'ın bu turda topladığı veriler:\n{context_block}\n\n"
+                    f"Değerlendirilecek öneri:\n{worker_text}"
+                )
+            ),
+        ]
+    ).content
+
+    evaluation = _parse_supervisor(raw)
+    if evaluation.get("approved"):
+        return worker_text
+
+    corrected = (evaluation.get("corrected") or "").strip()
+    if corrected and corrected.lower() != "öneri uygundur.":
+        return corrected
+    return worker_text
+
+
+def _stream_chunks(text: str, chunk_size: int = 6, delay_s: float = 0.012) -> Iterator[str]:
+    if not text:
+        yield ""
+        return
+    buf = ""
+    for i in range(0, len(text), chunk_size):
+        buf += text[i : i + chunk_size]
+        yield buf
+        time.sleep(delay_s)
+    if buf != text:
+        yield text
+
+
+def chat_skywise(messages: list[dict]) -> Iterator[str]:
+    """Sohbet tabanlı SkyWise asistanı.
+
+    Girdi: Gradio Chatbot(type="messages") formatı —
+        [{"role": "user"|"assistant", "content": str}, ...]
+    Çıktı: kümülatif metin parçaları (streaming) — son chunk tam yanıttır.
+
+    Worker (ReAct) araçları kullanarak yanıtı üretir; bir aktivite önerisi
+    turu yapıldıysa supervisor evaluator devreye girip yanıtı denetler ve
+    gerekirse düzeltilmiş versiyonu döner.
+    """
+    lc_messages = _gradio_to_lc_messages(messages)
+    n_original = len(lc_messages)
+
+    result = _chat_worker.invoke({"messages": lc_messages})
+    all_messages = result.get("messages", [])
+    new_messages = all_messages[n_original:]
+
+    final_ai = all_messages[-1] if all_messages else None
+    worker_text = (
+        final_ai.content if isinstance(final_ai, AIMessage) and final_ai.content else ""
+    )
+
+    if not worker_text:
+        worker_text = "Üzgünüm, şu an cevap üretemedim. Tekrar dener misin?"
+
+    if _turn_produced_recommendation(new_messages):
+        try:
+            final_text = _supervise_chat_turn(worker_text, new_messages, messages)
+        except Exception:
+            final_text = worker_text
+    else:
+        final_text = worker_text
+
+    yield from _stream_chunks(final_text)
 
 
 if __name__ == "__main__":
