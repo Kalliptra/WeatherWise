@@ -16,7 +16,9 @@ load_dotenv()
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-PLACES_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+PLACES_TEXT_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+PLACES_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
+PLACES_PHOTO_URL = "https://maps.googleapis.com/maps/api/place/photo"
 
 GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY")
 _USE_GOOGLE = bool(GOOGLE_PLACES_API_KEY)
@@ -212,16 +214,46 @@ def geocode_city(city: str, timeout: float = 10.0) -> tuple[float, float]:
     return lat, lon
 
 
-def _find_venues_google(lat: float, lon: float, place_type: str, radius_m: int, limit: int) -> list[dict]:
-    """Google Places Nearby Search ile venue listesi döndürür."""
+def _photo_url(photo_reference: str, max_width: int = 400) -> str:
+    return (
+        f"{PLACES_PHOTO_URL}?maxwidth={max_width}"
+        f"&photo_reference={urllib.parse.quote(photo_reference)}"
+        f"&key={GOOGLE_PLACES_API_KEY}"
+    )
+
+
+def _fetch_place_details(place_id: str) -> dict:
+    """Place Details API'den opening_hours ve photos alanlarını çeker."""
+    try:
+        resp = requests.get(
+            PLACES_DETAILS_URL,
+            params={
+                "place_id": place_id,
+                "fields": "opening_hours,photos",
+                "key": GOOGLE_PLACES_API_KEY,
+            },
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return {}
+        return resp.json().get("result", {})
+    except requests.RequestException:
+        return {}
+
+
+def _find_venues_google(
+    lat: float, lon: float, place_type: str, category: str, city: str, radius_m: int, limit: int
+) -> list[dict]:
+    """Google Places Text Search + Place Details ile venue listesi döndürür."""
     params = {
+        "query": f"{category} {city}",
         "location": f"{lat},{lon}",
         "radius": radius_m,
         "type": place_type,
         "key": GOOGLE_PLACES_API_KEY,
     }
     try:
-        resp = requests.get(PLACES_URL, params=params, timeout=15)
+        resp = requests.get(PLACES_TEXT_URL, params=params, timeout=15)
     except requests.RequestException as e:
         raise ConnectionError(f"Google Places erişim hatası: {e}") from e
 
@@ -245,6 +277,7 @@ def _find_venues_google(lat: float, lon: float, place_type: str, radius_m: int, 
             continue
 
         rating = r.get("rating")
+        review_count = r.get("user_ratings_total")
         place_id = r.get("place_id", "")
         dist = round(_haversine_km(lat, lon, vlat, vlon), 2)
 
@@ -254,6 +287,19 @@ def _find_venues_google(lat: float, lon: float, place_type: str, radius_m: int, 
             f"&destination_place_id={place_id}"
         )
 
+        # Place Details: açık/kapalı + fotoğraf
+        open_now: Optional[bool] = None
+        photo_url: Optional[str] = None
+        if place_id:
+            details = _fetch_place_details(place_id)
+            oh = details.get("opening_hours", {})
+            open_now = oh.get("open_now")
+            photos = details.get("photos", [])
+            if photos:
+                ref = photos[0].get("photo_reference", "")
+                if ref:
+                    photo_url = _photo_url(ref)
+
         venues.append({
             "name": name,
             "type": place_type,
@@ -261,8 +307,11 @@ def _find_venues_google(lat: float, lon: float, place_type: str, radius_m: int, 
             "lon": vlon,
             "distance_km": dist,
             "rating": rating,
+            "review_count": review_count,
             "place_id": place_id,
             "maps_url": maps_url,
+            "open_now": open_now,
+            "photo_url": photo_url,
         })
 
     venues.sort(key=lambda v: v["distance_km"])
@@ -310,8 +359,11 @@ def _find_venues_overpass(lat: float, lon: float, tags: list[tuple[str, str]], r
             "lon": vlon,
             "distance_km": round(_haversine_km(lat, lon, vlat, vlon), 2),
             "rating": None,
+            "review_count": None,
             "place_id": None,
             "maps_url": f"https://www.google.com/maps/search/{urllib.parse.quote(name)}",
+            "open_now": None,
+            "photo_url": None,
         })
 
     venues.sort(key=lambda v: v["distance_km"])
@@ -343,7 +395,7 @@ def find_venues(
     def _fetch():
         if _USE_GOOGLE:
             place_type = _normalize_places_type(category)
-            return _find_venues_google(lat, lon, place_type, radius_m, limit)
+            return _find_venues_google(lat, lon, place_type, category, city, radius_m, limit)
         else:
             tags = _normalize_category(category)
             return _find_venues_overpass(lat, lon, tags, radius_m, limit, timeout)
@@ -370,7 +422,13 @@ def format_venues_for_llm(venues: list[dict], category: str, city: str, lang: st
     for v in venues:
         rating_str = f", ⭐{v['rating']}" if v.get("rating") else ""
         maps_str = f" → [Rota]({v['maps_url']})" if v.get("maps_url") else ""
-        lines.append(f"- {v['name']} ({v['type']}, ~{v['distance_km']}km{rating_str}){maps_str}")
+        if v.get("open_now") is True:
+            open_str = ", ✅ Açık" if lang == "tr" else ", ✅ Open now"
+        elif v.get("open_now") is False:
+            open_str = ", ❌ Kapalı" if lang == "tr" else ", ❌ Closed"
+        else:
+            open_str = ""
+        lines.append(f"- {v['name']} (~{v['distance_km']}km{rating_str}{open_str}){maps_str}")
 
     return header + "\n" + "\n".join(lines)
 

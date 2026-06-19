@@ -144,7 +144,15 @@ Cevap stili:
 - Rating bilgisi varsa önerilere ekle (⭐4.5 gibi).
 - Öneri turunda 3-5 somut aktivite ver; follow-up'larda kullanıcının sorduğu
   spesifik konuya odaklan, listeyi tekrarlama.
-- Kısa hava özetiyle başla (sıcaklık + kondisyon + UV), sonra önerilere geç."""
+- Kısa hava özetiyle başla (sıcaklık + kondisyon + UV), sonra önerilere geç.
+
+LOC ETİKETİ (harita sistemi için):
+Konuşmada spesifik, navigasyon yapılabilir bir yerden bahsediyorsan
+(venue_search KULLANMADAN — örn. Galata Kulesi, Çamlıca Tepesi, Kadıköy İskelesi)
+ilgili yerin hemen arkasına [LOC:tam yer adı, şehir] etiketini yaz.
+Etiket kullanıcıya gösterilmeyecek, harita sistemi tarafından okunacak.
+Her yanıtta en fazla 1 LOC etiketi kullan.
+venue_search araç çağrısı yaptıysan LOC etiketi YAZMA."""
 
 
 # ---- İngilizce prompt'lar ----
@@ -284,7 +292,15 @@ Response style:
 - Use real venue names from venue_search output — never invent names.
 - Include ratings in suggestions if available (e.g. ⭐4.5).
 - For activity turns: give 3-5 concrete suggestions; for follow-ups focus on the specific question, don't repeat the full list.
-- Start with a brief weather summary (temperature + condition + UV), then move to suggestions."""
+- Start with a brief weather summary (temperature + condition + UV), then move to suggestions.
+
+LOC TAG (for the map system):
+If you mention a specific, navigable place in your response
+(WITHOUT using venue_search — e.g. Galata Tower, Bosphorus Bridge, Çamlıca Hill)
+add [LOC:full place name, city] immediately after that place name.
+This tag is hidden from the user and read only by the map system.
+Use at most 1 LOC tag per response.
+If you called venue_search, do NOT add a LOC tag."""
 
 
 # ---- Prompt registry ----

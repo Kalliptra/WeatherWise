@@ -4,6 +4,12 @@ Tema, `document.body.dataset.theme` üzerinden seçilir; her tema yalnızca CSS
 değişkenlerini override eder, bileşen stilleri tek bir yerde tanımlıdır.
 """
 
+import html as _html
+import json as _json
+import os as _os
+
+_GMAPS_KEY = _os.getenv("GOOGLE_PLACES_API_KEY", "")
+
 
 def weather_to_theme(weather: dict) -> str:
     """get_weather() şemasındaki dict'i 7 temadan birine eşler.
@@ -149,8 +155,115 @@ def render_weather_panel(weather: dict, uv=None) -> str:
     )
 
 
+def _fmt_review_count(n) -> str:
+    if n is None:
+        return ""
+    if n >= 1000:
+        return f"{n / 1000:.1f}k yorum".replace(".0k", "k")
+    return f"{n} yorum"
+
+
+def _map_iframe(center_lat: float, center_lon: float, venues_data: list[dict], zoom: int = 14) -> str:
+    """Haritayı iframe srcdoc olarak render eder.
+
+    GOOGLE_PLACES_API_KEY varsa Google Maps JavaScript API kullanır,
+    yoksa CartoDB Voyager tile'ları (Google Maps benzeri stil) ile Leaflet kullanır.
+    """
+    venues_json = _json.dumps(venues_data)
+
+    if _GMAPS_KEY:
+        map_doc = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  html, body {{ margin: 0; padding: 0; height: 100%; }}
+  #map {{ width: 100%; height: 100vh; }}
+  .gm-popup {{ font-family: Arial, sans-serif; font-size: 13px; }}
+  .gm-popup a {{ color: #1a73e8; font-weight: 600; text-decoration: none; }}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+var venues = {venues_json};
+function initMap() {{
+  var map = new google.maps.Map(document.getElementById('map'), {{
+    center: {{ lat: {center_lat}, lng: {center_lon} }},
+    zoom: {zoom},
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false
+  }});
+  var infoWindow = new google.maps.InfoWindow();
+  venues.forEach(function(v) {{
+    var marker = new google.maps.Marker({{
+      position: {{ lat: v.lat, lng: v.lon }},
+      map: map,
+      title: v.name
+    }});
+    var c = '<div class="gm-popup"><b>' + v.name + '</b>';
+    if (v.open_label) c += ' <span style="font-size:11px;">' + v.open_label + '</span>';
+    if (v.rating) c += '<br>⭐ ' + v.rating;
+    if (v.review_count_str) c += ' &middot; ' + v.review_count_str;
+    if (v.maps_url) c += '<br><a href="' + v.maps_url + '" target="_blank">🗺 ' + (v.btn_label || 'Rota Al') + '</a>';
+    c += '</div>';
+    marker.addListener('click', function() {{
+      infoWindow.setContent(c);
+      infoWindow.open(map, marker);
+    }});
+    if (v.open_popup) {{
+      infoWindow.setContent(c);
+      infoWindow.open(map, marker);
+    }}
+  }});
+}}
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={_GMAPS_KEY}&callback=initMap" async defer></script>
+</body>
+</html>"""
+    else:
+        map_doc = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  html, body {{ margin: 0; padding: 0; height: 100%; }}
+  #map {{ width: 100%; height: 100vh; }}
+  a {{ color: #1a73e8; font-weight: 600; }}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var map = L.map('map').setView([{center_lat}, {center_lon}], {zoom});
+L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+  attribution: '&copy; OpenStreetMap &copy; CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19
+}}).addTo(map);
+var venues = {venues_json};
+venues.forEach(function(v) {{
+  var c = '<b>' + v.name + '</b>';
+  if (v.open_label) c += ' <span style="font-size:11px;">' + v.open_label + '</span>';
+  if (v.rating) c += '<br>⭐ ' + v.rating;
+  if (v.review_count_str) c += ' &middot; ' + v.review_count_str;
+  if (v.maps_url) c += '<br><a href="' + v.maps_url + '" target="_blank">🗺 ' + (v.btn_label || 'Rota Al') + '</a>';
+  var marker = L.marker([v.lat, v.lon]).addTo(map).bindPopup(c);
+  if (v.open_popup) marker.openPopup();
+}});
+</script>
+</body>
+</html>"""
+
+    srcdoc = _html.escape(map_doc, quote=True)
+    return f'<iframe srcdoc="{srcdoc}" style="width:100%;height:280px;border:none;border-radius:16px;" loading="lazy"></iframe>'
+
+
 def render_map_panel(venues: list[dict]) -> str:
-    """Leaflet.js haritası — venue listesi için marker'lar ve rota linkleri içerir."""
+    """Venue kartları + Leaflet.js haritası (iframe ile)."""
     if not venues:
         return ""
 
@@ -161,38 +274,98 @@ def render_map_panel(venues: list[dict]) -> str:
     center_lat = sum(v["lat"] for v in valid) / len(valid)
     center_lon = sum(v["lon"] for v in valid) / len(valid)
 
-    markers_js = ""
+    # Venue kartları (yatay kaydırılabilir, haritanın üstünde)
+    cards_html = ""
     for v in valid:
-        name = v["name"].replace("'", "\\'").replace('"', '\\"')
-        rating = f" ⭐{v['rating']}" if v.get("rating") else ""
-        maps_url = v.get("maps_url", "")
-        popup = f"{name}{rating}"
-        if maps_url:
-            popup += f'<br><a href=\\"{maps_url}\\" target=\\"_blank\\" style=\\"color:#4fa3c7;font-weight:600\\">🗺 Rota Al</a>'
-        markers_js += (
-            f"L.marker([{v['lat']}, {v['lon']}])"
-            f".addTo(map)"
-            f".bindPopup('{popup}');\n"
-        )
+        rating_str = f"⭐ {v['rating']}" if v.get("rating") else ""
+        reviews_str = _fmt_review_count(v.get("review_count"))
+        meta_parts = [p for p in [rating_str, reviews_str] if p]
+        meta_line = " · ".join(meta_parts)
+        dist_str = f"{v['distance_km']} km" if v.get("distance_km") is not None else ""
+        maps_url = v.get("maps_url", "#")
+        safe_name = _html.escape(v["name"])
+
+        # Açık/Kapalı rozeti
+        open_now = v.get("open_now")
+        if open_now is True:
+            badge = '<span style="font-size:0.7rem;font-weight:700;color:#1a7a3c;background:#d4f7e1;border-radius:6px;padding:2px 7px;">Açık</span>'
+        elif open_now is False:
+            badge = '<span style="font-size:0.7rem;font-weight:700;color:#b91c1c;background:#fee2e2;border-radius:6px;padding:2px 7px;">Kapalı</span>'
+        else:
+            badge = ""
+
+        # Fotoğraf
+        photo_url = v.get("photo_url")
+        photo_html = (
+            f'<img src="{photo_url}" alt="{safe_name}" '
+            f'style="width:100%;height:90px;object-fit:cover;border-radius:8px;margin-bottom:4px;" '
+            f'loading="lazy" onerror="this.style.display=\'none\'">'
+        ) if photo_url else ""
+
+        cards_html += f"""
+<div style="display:flex;flex-direction:column;min-width:160px;max-width:200px;
+background:rgba(255,255,255,0.13);border-radius:12px;padding:10px 12px;gap:4px;
+flex-shrink:0;border:1px solid rgba(255,255,255,0.18);overflow:hidden;">
+  {photo_html}
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
+    <div style="font-weight:600;font-size:0.82rem;line-height:1.3;color:var(--ink,#1a1a2e);">{safe_name}</div>
+    {badge}
+  </div>
+  <div style="font-size:0.76rem;color:var(--ink-soft,#555);">{meta_line}</div>
+  <div style="font-size:0.73rem;color:var(--ink-faint,#888);">{dist_str}</div>
+  <a href="{maps_url}" target="_blank"
+     style="margin-top:2px;font-size:0.76rem;font-weight:600;color:#4fa3c7;text-decoration:none;">🗺 Rota Al</a>
+</div>"""
+
+    # iframe için veri listesi (JSON güvenli)
+    def _open_label(v):
+        if v.get("open_now") is True:
+            return "✅ Açık"
+        if v.get("open_now") is False:
+            return "❌ Kapalı"
+        return ""
+
+    venues_data = [{
+        "lat": v["lat"],
+        "lon": v["lon"],
+        "name": v["name"],
+        "rating": v.get("rating"),
+        "review_count": v.get("review_count"),
+        "review_count_str": _fmt_review_count(v.get("review_count")),
+        "open_label": _open_label(v),
+        "maps_url": v.get("maps_url", ""),
+        "btn_label": "Rota Al",
+        "open_popup": False,
+    } for v in valid]
+
+    iframe_html = _map_iframe(center_lat, center_lon, venues_data, zoom=14)
 
     return f"""
 <div style="margin-top:14px;">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<div id="skywise-map" style="height:240px;border-radius:16px;overflow:hidden;border:1px solid rgba(0,0,0,0.12);"></div>
-<script>
-setTimeout(function() {{
-  if (typeof L === 'undefined') return;
-  if (document.getElementById('skywise-map')._leaflet_id) return;
-  var map = L.map('skywise-map').setView([{center_lat}, {center_lon}], 14);
-  L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-    attribution: '© OpenStreetMap contributors'
-  }}).addTo(map);
-  {markers_js}
-}}, 300);
-</script>
+<div style="display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:thin;">
+{cards_html}
+</div>
+{iframe_html}
 </div>
 """
+
+
+def render_location_map(name: str, lat: float, lon: float) -> str:
+    """Tek pinli Leaflet haritası — spesifik lokasyon gösterimi için (iframe ile)."""
+    maps_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
+    venues_data = [{
+        "lat": lat,
+        "lon": lon,
+        "name": name,
+        "rating": None,
+        "review_count": None,
+        "review_count_str": "",
+        "maps_url": maps_url,
+        "btn_label": "Yol Tarifi Al",
+        "open_popup": True,
+    }]
+    iframe_html = _map_iframe(lat, lon, venues_data, zoom=15)
+    return f'<div style="margin-top:14px;">{iframe_html}</div>'
 
 
 def render_panel_placeholder(message: str) -> str:

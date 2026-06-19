@@ -57,258 +57,112 @@
       "uv_advice_en": "Sunglasses recommended."
     }
   },
-  "venues_park|i̇stanbul|2026-06-19": {
-    "date": "2026-06-19",
-    "data": [
-      {
-        "name": "Blue Underground Modern City-Toilet",
-        "type": "park",
-        "lat": 41.0076843,
-        "lon": 28.9773862,
-        "distance_km": 0.19,
-        "rating": 4.7,
-        "place_id": "ChIJlee0jb25yhQRSfIzdtczZsM",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Blue%20Underground%20Modern%20City-Toilet&destination_place_id=ChIJlee0jb25yhQRSfIzdtczZsM"
-      },
-      {
-        "name": "Kadırga Parkı",
-        "type": "park",
-        "lat": 41.00463409999999,
-        "lon": 28.9688864,
-        "distance_km": 0.62,
-        "rating": 4.3,
-        "place_id": "ChIJx9vAR5q5yhQRMukHnmCnRVA",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Kad%C4%B1rga%20Park%C4%B1&destination_place_id=ChIJx9vAR5q5yhQRMukHnmCnRVA"
-      },
-      {
-        "name": "Gülhane Park",
-        "type": "park",
-        "lat": 41.0133079,
-        "lon": 28.9815101,
-        "distance_km": 0.9,
-        "rating": 4.7,
-        "place_id": "ChIJK9q8Nce5yhQRy0am325qXgY",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=G%C3%BClhane%20Park&destination_place_id=ChIJK9q8Nce5yhQRy0am325qXgY"
-      },
-      {
-        "name": "AKSARAY METRO YERALTI ÇARŞISI",
-        "type": "park",
-        "lat": 41.0115236,
-        "lon": 28.9487768,
-        "distance_km": 2.34,
-        "rating": 4.1,
-        "place_id": "ChIJIWtHmii6yhQR7H-I2yBOEJs",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=AKSARAY%20METRO%20YERALTI%20%C3%87AR%C5%9EISI&destination_place_id=ChIJIWtHmii6yhQR7H-I2yBOEJs"
-      },
-      {
-        "name": "Karabaş Hazretleri Türbesi",
-        "type": "park",
-        "lat": 41.0272163,
-        "lon": 28.9803155,
-        "distance_km": 2.35,
-        "rating": 4.5,
-        "place_id": "ChIJndo1lN65yhQRQPPS53e4C6s",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Karaba%C5%9F%20Hazretleri%20T%C3%BCrbesi&destination_place_id=ChIJndo1lN65yhQRQPPS53e4C6s"
-      },
-      {
-        "name": "Şışhane Park",
-        "type": "park",
-        "lat": 41.0278089,
-        "lon": 28.97240340000001,
-        "distance_km": 2.4,
-        "rating": 4.2,
-        "place_id": "ChIJ5UgDvea5yhQRy0fgZUiWe6w",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=%C5%9E%C4%B1%C5%9Fhane%20Park&destination_place_id=ChIJ5UgDvea5yhQRy0fgZUiWe6w"
-      },
-      {
-        "name": "Kucuk Mustafapasa Park",
-        "type": "park",
-        "lat": 41.02599199999999,
-        "lon": 28.95730699999999,
-        "distance_km": 2.68,
-        "rating": 3.3,
-        "place_id": "ChIJRfYUIve5yhQRwkr83HG9jEg",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Kucuk%20Mustafapasa%20Park&destination_place_id=ChIJRfYUIve5yhQRwkr83HG9jEg"
-      },
-      {
-        "name": "Algerian Hasan Pasha Park",
-        "type": "park",
-        "lat": 41.03035049999999,
-        "lon": 28.9671056,
-        "distance_km": 2.76,
-        "rating": 3.9,
-        "place_id": "ChIJrXfWfuS5yhQR6ZezsWPNEPk",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Algerian%20Hasan%20Pasha%20Park&destination_place_id=ChIJrXfWfuS5yhQR6ZezsWPNEPk"
-      }
-    ]
-  },
   "venues_kafe|i̇stanbul|2026-06-19": {
     "date": "2026-06-19",
     "data": [
       {
-        "name": "Mado",
+        "name": "Harab'be Cafe",
         "type": "cafe",
-        "lat": 41.0081399,
-        "lon": 28.9760521,
-        "distance_km": 0.2,
-        "rating": 3.7,
-        "place_id": "ChIJC_89GZa5yhQRAenIvYOc_a0",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Mado&destination_place_id=ChIJC_89GZa5yhQRAenIvYOc_a0"
+        "lat": 41.0084009,
+        "lon": 28.9761307,
+        "distance_km": 0.23,
+        "rating": 4.9,
+        "review_count": 4746,
+        "place_id": "ChIJJx0PAZa5yhQRmAuk1Cg2o4U",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Harab%27be%20Cafe&destination_place_id=ChIJJx0PAZa5yhQRmAuk1Cg2o4U",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3mTk9dILgFbqs8ccaWlviLORdhZwVQJGoHdB5k8udO-8Qnz5U9hJ2y5X9didXks-8P-BrYTpRQY_I25Yf_pjxwcAle24zF4QkneVgZwpMVrInrajUCTTIn6UUVW1xiDSalxqVvT0-Is1XOBjzqcfWOcAkQZX-gl8mV-GMvfEDshnOn81TAb9AombI5UER08f6Vleyl-OUX_-LbeYbBCOfyA424Y2eO5lNE5DKIfE4Xu013blbznwOvoNwmpqZgrAsaoCs-FNMS8jj6f1W84rxbBRGv9Fzhs6O6G-qjcdbDCuRuf90-oH2c5FMnu9WYGoU6iimsVpynvCt-eT4wK3LBKkfXouHrkpQitwIBhMX2Yy0qa2RwzxD5PQL4unxcvO7L0F8tJ-wpSK97UZAmD6QUEXLpe4AXlbhK_rOjGmIDsDd4&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       },
       {
-        "name": "Blue House Hotel & Rooftop – 360 Sunset View of Istanbul",
+        "name": "Miran Nargile Cafe",
         "type": "cafe",
-        "lat": 41.0055144,
-        "lon": 28.9790548,
-        "distance_km": 0.28,
-        "rating": 4.5,
-        "place_id": "ChIJc1w4_ry5yhQRHSdRMehPf0E",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Blue%20House%20Hotel%20%26%20Rooftop%20%E2%80%93%20360%20Sunset%20View%20of%20Istanbul&destination_place_id=ChIJc1w4_ry5yhQRHSdRMehPf0E"
+        "lat": 41.008481,
+        "lon": 28.974932,
+        "distance_km": 0.25,
+        "rating": 4.7,
+        "review_count": 291,
+        "place_id": "ChIJNaoIOle5yhQRglIz6oImAEA",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Miran%20Nargile%20Cafe&destination_place_id=ChIJNaoIOle5yhQRglIz6oImAEA",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3mMY_Z0QXD5gdPUbYjUcodeAN-df4RuH7I-a7I25Nh9OybYmPSb10V9Ij5g9NmSB_7QDbo91oGccpMDorTAfzeb7N1QC0xlTgPdojG55mO2B-rzseUKOXO04wmGxWTXwA1OurCXCEReaZXxjFUAri_OZZ1kSwU7ufRkvrtALb2xS4hgjdl8qpUwCHbuP2aaYix5a-CmQachiifIRnN3l7m9go9nNtXIwBRnmu1Yn_OWtWiplXSpKJxQ6iwtxdzlCpLJYYyMb7GMPK4lUCX1AhfXJo375WPlSiXzoNvcQWuIogCDKZBNcP78LstIX5xroUAOeT1JEy2W6qzqqOohy713vF6k4Rh9XTv3LowoxZuad_1pLdMqhJg0D4LZWbdMDIpYnXQIacc8e6Y9vjSUGMO5w51Nhsnv7kwbB4_NbcAPpNxl&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       },
       {
-        "name": "Orient Express & Spa by Orka Hotels",
+        "name": "My Terrace Cafe & Restaurant",
         "type": "cafe",
-        "lat": 41.01325670000001,
-        "lon": 28.97761199999999,
-        "distance_km": 0.78,
-        "rating": 4,
-        "place_id": "ChIJbUDBCsC5yhQRrbehwLl8acs",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Orient%20Express%20%26%20Spa%20by%20Orka%20Hotels&destination_place_id=ChIJbUDBCsC5yhQRrbehwLl8acs"
+        "lat": 41.004901,
+        "lon": 28.9730385,
+        "distance_km": 0.29,
+        "rating": 4.7,
+        "review_count": 5770,
+        "place_id": "ChIJXSG-dWm5yhQR5r4ew-NqGzE",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=My%20Terrace%20Cafe%20%26%20Restaurant&destination_place_id=ChIJXSG-dWm5yhQR5r4ew-NqGzE",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3kM-7BwqJk58V_99aF89DbNH7yh64iqOADSOPfB0X7EpDQ6VmFQJu1n7uxxHuAVGby20PP16rlQ0esoN5BJQ8wqjtwKW7io5HNsN8yNxAqh5Rd2z-qqFifIpQffGajlMMx9jC5tFeH0FQxZ2V__qGfJ_F6uYUpaL4jK7IoidH-mqi8V_I3liT-VjfsXPAvWzAqsNwGHJ8WPDqkI8KcZoOToDdBeL0GL9kQ_ME19g3gXfTuF9ew-C6q6HS-7Y3Awdk6IOcZ4wtEYPTUqf3tk-QdeWFKEY13cqsG1B_8GZXjEc3RvMSnClD26HKI-jFZtwDL10_BoFON1qay7_MCOeep3u4_fK0_pXqpifQOCJqoy12W7ftTromx_aL4H2DWq3ZAzQPr0Uv3vS_PeF2zlkdUKLlorcF7xzOr5WHVp5w86WEUU&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       },
       {
-        "name": "Ağa Kapısı",
+        "name": "Coffee No.4",
         "type": "cafe",
-        "lat": 41.01743399999999,
-        "lon": 28.964572,
-        "distance_km": 1.55,
-        "rating": 4.1,
-        "place_id": "ChIJv1t7p_K5yhQRHSxFrbaahvU",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=A%C4%9Fa%20Kap%C4%B1s%C4%B1&destination_place_id=ChIJv1t7p_K5yhQRHSxFrbaahvU"
+        "lat": 41.0091161,
+        "lon": 28.9751967,
+        "distance_km": 0.31,
+        "rating": 4.9,
+        "review_count": 2863,
+        "place_id": "ChIJ_6V4zqC5yhQREapVeXSTsHk",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Coffee%20No.4&destination_place_id=ChIJ_6V4zqC5yhQREapVeXSTsHk",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3ljdu6JGiYdedQdfA67_-xP0zaVa0RHy_xemDis4eCPf1GpVtxQsMOA1tVrKMhdXsURREMdbZryqUrBeFuT0EpASqt3Th4A28RU5ImLeI2uqzJZXfTf-s_s94kscVY4LAnaT1g1jixF0WThMWvNBF4g2BVO7XMPSsDmOs1UGawRaZFRS2JSaZhAtO0cMIzlPc4zrOEtxNa_GfOajOMUV1hrxSp854d3A4WOZDH7K-iCkEntI1g8jeX6E7dhbafY3_BgO7mXp3IlC08HlDhkjL989PJuxg04CMtFPjk3oaK8G8q_S2BUuhH64DNQWhsYRWXiH7rL_Y6lGA9YK9Nmj_KXGzyCw0viERgUZbVd-tw2eE2zAqltwklcR1tc7iS6TS1SPWd2TQcKAlFs199TXqFG81R8oPk9so2pGW_61sv5ncJx5xkNO3gYYc73lg&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       },
       {
-        "name": "Vefa Bozacisi",
+        "name": "Turkish Street Cafe",
         "type": "cafe",
-        "lat": 41.0153183,
-        "lon": 28.9584202,
-        "distance_km": 1.77,
-        "rating": 4.5,
-        "place_id": "ChIJNRVgoIy5yhQRdNH4KPnjiTo",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Vefa%20Bozacisi&destination_place_id=ChIJNRVgoIy5yhQRdNH4KPnjiTo"
+        "lat": 41.0035012,
+        "lon": 28.9752499,
+        "distance_km": 0.32,
+        "rating": 4.9,
+        "review_count": 132,
+        "place_id": "ChIJO15WE5i5yhQRKLXDrqIqayc",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Turkish%20Street%20Cafe&destination_place_id=ChIJO15WE5i5yhQRKLXDrqIqayc",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3k7hDJcOmzFw6TI3KxVSY0WWy5NSOS8hw16AmoWaXYWlaNhALMWmyN1H2SloWHv1y_eK5rEChxOGXNh0FstlyQq7fFFITpY2mh3Zy5h1k-uJLV1XquPIx_Mw3g7jvj9DbZD-foeGrRgyiki8UP3endQ_VHdZgE7zEngBZioGptjxjn2hAP9aHlvFu4i1NzhSKeBUQqeJ8Ne9bAHQfOHK8Kt8N10VKPceeEp0AcpV2H4ZaSR-urr7pPvayGaUEZmfcHebT_Ya1iMa1LIxmsMJkTqItR0TRV1INqcii-BcED_Hs3h7htfBVtAon43BU_fKN9ovVgecWl7tvqrch6S2oxi9Ipnv94KQH191zMVlPxM-zG3JrxLilObGeLP7ztaLB-sfB2O36VnQM3mNs4ZZ0ol9N4W7NAJoHnQjQYMj7-3lQV7&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       },
       {
-        "name": "Georges Hotel Galata",
+        "name": "Palatium Cafe and Restaurant",
         "type": "cafe",
-        "lat": 41.0268827,
-        "lon": 28.9755556,
-        "distance_km": 2.28,
-        "rating": 4.5,
-        "place_id": "ChIJf7cjW-e5yhQReQJOcLddVxg",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Georges%20Hotel%20Galata&destination_place_id=ChIJf7cjW-e5yhQReQJOcLddVxg"
-      },
-      {
-        "name": "Gritti Pera HOTEL & SPA",
-        "type": "cafe",
-        "lat": 41.0302957,
-        "lon": 28.9744879,
-        "distance_km": 2.66,
-        "rating": 4.1,
-        "place_id": "ChIJ4W6fz-C5yhQRj0f58XJ3PLU",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Gritti%20Pera%20HOTEL%20%26%20SPA&destination_place_id=ChIJ4W6fz-C5yhQRj0f58XJ3PLU"
-      },
-      {
-        "name": "Dilek Pastanesi İstiklal",
-        "type": "cafe",
-        "lat": 41.032022,
-        "lon": 28.976311,
-        "distance_km": 2.85,
-        "rating": 4,
-        "place_id": "ChIJf4ApAGC3yhQROnkmUeUi4Po",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Dilek%20Pastanesi%20%C4%B0stiklal&destination_place_id=ChIJf4ApAGC3yhQROnkmUeUi4Po"
-      }
-    ]
-  },
-  "venues_müze|i̇stanbul|2026-06-19": {
-    "date": "2026-06-19",
-    "data": [
-      {
-        "name": "Marmara University Cumhuriyet Museum and Art Gallery",
-        "type": "museum",
-        "lat": 41.0050781,
-        "lon": 28.9745927,
-        "distance_km": 0.18,
-        "rating": 4.4,
-        "place_id": "ChIJ4ZOGjJe5yhQRMxtgT5PMJ28",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Marmara%20University%20Cumhuriyet%20Museum%20and%20Art%20Gallery&destination_place_id=ChIJ4ZOGjJe5yhQRMxtgT5PMJ28"
-      },
-      {
-        "name": "Basilica Cistern",
-        "type": "museum",
-        "lat": 41.00838400000001,
-        "lon": 28.977878,
-        "distance_km": 0.28,
+        "lat": 41.0061307,
+        "lon": 28.9803778,
+        "distance_km": 0.38,
         "rating": 4.6,
-        "place_id": "ChIJyWrG4L25yhQRcYRt7uEvwGA",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Basilica%20Cistern&destination_place_id=ChIJyWrG4L25yhQRcYRt7uEvwGA"
+        "review_count": 2146,
+        "place_id": "ChIJmYLPary5yhQRtlFebfw9aEQ",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Palatium%20Cafe%20and%20Restaurant&destination_place_id=ChIJmYLPary5yhQRtlFebfw9aEQ",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3mlOyyV01mLKdwm3dOOiCv_EjWYmsnBHIzTaM7RVCwqcGNNt1DiZtbKB3K_GdaCrGdll1iM38d_KUac2vmdGfNk2f1Prtx3ryWdCYZmLEqx-4cCN-7ws-kvqRVLtLCxXdo3Xfo8ZYi-7oHl99QxAV439Nb47chdqXybzZTM7CT_izaKii00lVnG7VlOM3N2SckiGlpMvoF1f23rKquckYLlj4DvNf-DTZdY7HEjiBErJSpAAonHLqfBYgNtzpnyzJhJ66Wuy_NpCaIUDotMEVqweUVg6qMOPyOZx7OdwU2hRvw0_kQNiFF7LdGHk2Fesq1lCbWVVKEOXDvRiDXvI9BDzjOZ13LNhtAIX66xg5pSJpT3L722iO_X9aJzL0MC9xTdCZYR4WQo_h4S2DO18BhJpMPKftIJQUTKpjau5Y69E8Q&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       },
       {
-        "name": "Ahmet Hamdi Tanpınar Edebiyat Müze Kütüphanesi",
-        "type": "museum",
-        "lat": 41.0110551,
-        "lon": 28.9783412,
-        "distance_km": 0.56,
-        "rating": 4.6,
-        "place_id": "ChIJcUS2aL-5yhQRCl4rn9pkvoc",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Ahmet%20Hamdi%20Tanp%C4%B1nar%20Edebiyat%20M%C3%BCze%20K%C3%BCt%C3%BCphanesi&destination_place_id=ChIJcUS2aL-5yhQRCl4rn9pkvoc"
+        "name": "Mitara Cafe & Art",
+        "type": "cafe",
+        "lat": 41.0034936,
+        "lon": 28.9734747,
+        "distance_km": 0.38,
+        "rating": 4.7,
+        "review_count": 349,
+        "place_id": "ChIJcajLTJi5yhQRE8JWpGRFB50",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Mitara%20Cafe%20%26%20Art&destination_place_id=ChIJcajLTJi5yhQRE8JWpGRFB50",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3lnxUYrUGpYr8w5StXs8O0fF3q6iFBKQ6BGDVIdoQCDqOkJ1WfT6xR_MNXWmE4yMCjpQzhVSdxSmFrlG-ID6pH2obMt6cF7eic6wSYcFQei2LAqZk1LLB6WdpmC71rFGMedo6mPBCitZMBcfAxB1WBswtFF3OXR_8uzGKqPraGMJ6I8WSE7CB9YzcYHo_ipOKG69LTMU8_FYtSeDyLhP_xF_3zjqehllAXnIfMHMngoQMrHoSMjiXWL9rxrsy2t43GU1FF7VMKQLyKzl_wkpRd-iZCiFBlYobavpL4veoX0W6Rs4QufZubnM7tUH0J3y1uPDPg0Casgd7nUVc4CW_eBpblkT7-Nk0ZtiP_Dm0RIY74KqgMEXWZ_TUprRiGWMh0Djo45bScUNmSy0yfSMe5jnXdMAYthH1dLT-MvIhe_9so&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       },
       {
-        "name": "Hagia Irene",
-        "type": "museum",
-        "lat": 41.00960989999999,
-        "lon": 28.9811834,
-        "distance_km": 0.57,
-        "rating": 4.1,
-        "place_id": "ChIJjRi6Krm5yhQR4CnePcY1JP8",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Hagia%20Irene&destination_place_id=ChIJjRi6Krm5yhQR4CnePcY1JP8"
-      },
-      {
-        "name": "Istanbul Archaeological Museums",
-        "type": "museum",
-        "lat": 41.0116855,
-        "lon": 28.9813305,
-        "distance_km": 0.75,
-        "rating": 4.6,
-        "place_id": "ChIJQbdCWr-5yhQRKTjvSx6RF7M",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Istanbul%20Archaeological%20Museums&destination_place_id=ChIJQbdCWr-5yhQRKTjvSx6RF7M"
-      },
-      {
-        "name": "Topkapi Palace Museum",
-        "type": "museum",
-        "lat": 41.0115195,
-        "lon": 28.98337889999999,
-        "distance_km": 0.85,
-        "rating": 4.6,
-        "place_id": "ChIJM_ilr7i5yhQRAFMBw0MZqhU",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Topkapi%20Palace%20Museum&destination_place_id=ChIJM_ilr7i5yhQRAFMBw0MZqhU"
-      },
-      {
-        "name": "Salt Galata",
-        "type": "museum",
-        "lat": 41.0239214,
-        "lon": 28.9734887,
-        "distance_km": 1.96,
-        "rating": 4.5,
-        "place_id": "ChIJ9XlKFOi5yhQRpjqu9uyObWE",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Salt%20Galata&destination_place_id=ChIJ9XlKFOi5yhQRpjqu9uyObWE"
-      },
-      {
-        "name": "Istanbul Museum of Modern Art",
-        "type": "museum",
-        "lat": 41.02591959999999,
-        "lon": 28.9828383,
-        "distance_km": 2.25,
-        "rating": 4.4,
-        "place_id": "ChIJw8JuD9m5yhQRnegQbG9Irjs",
-        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Istanbul%20Museum%20of%20Modern%20Art&destination_place_id=ChIJw8JuD9m5yhQRnegQbG9Irjs"
+        "name": "Dervis Cafe 2",
+        "type": "cafe",
+        "lat": 41.0080641,
+        "lon": 28.9717171,
+        "distance_km": 0.4,
+        "rating": 4.8,
+        "review_count": 1520,
+        "place_id": "ChIJ_a8Lr725yhQRr_g9mL5c7KY",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Dervis%20Cafe%202&destination_place_id=ChIJ_a8Lr725yhQRr_g9mL5c7KY",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3mEFDXCGmH7sLCCE4_sHjLocEYiZbJvR1iBj7WP9FiVWWJV29F5YA-Om0bBWQWoMcjVdP6BT8nve9LNmZ2Wjtc7bBzdS7cEtT4JkHxzroCyHDnadO8GS_igTk10LzT5cwunI-j1brrQdgVc25DBioX5R6v3MfR8IEKOzVDL_OpqgN8D20MFrvOGHBAJblDmBDvsdYtvvC2DVnN-JO__6Lclmnl_bU9WMqLyZDKEdfmZY7TVzhh0cJrvz0TlJqgYq35Pi9NOSb3NMDnI8BvdldiGvrb_nWfhOQgGVe9HZkR6xxb_zdUym0zQu09AkhDX7CbmvGpw_4DnJL__ENjFaRzA9Y22j7cBz8uZgPjW-nfOAc87Dw_g6lV13EHsnCrgR54o3Fvzfpy3NHl8LVY8cTFmYPexJvlvhrZlkNcS1fek4Fh6DqN_ttzP1pqEf4Qz&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       }
     ]
   }

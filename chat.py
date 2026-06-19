@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Iterator
 
@@ -31,6 +32,18 @@ _TURKISH_WORDS = {
 }
 
 _current_language: str = "tr"
+_last_location: str = ""
+
+_LOC_TAG_RE = re.compile(r'\[LOC:([^\]]+)\]')
+
+
+def get_last_location() -> str:
+    return _last_location
+
+
+def clear_last_location() -> None:
+    global _last_location
+    _last_location = ""
 
 
 def _detect_language(text: str) -> str:
@@ -234,5 +247,14 @@ def chat_skywise(messages: list[dict]) -> Iterator[str]:
             final_text = worker_text
     else:
         final_text = worker_text
+
+    # LOC etiketi: harita sistemi için lokasyon al, etiket kullanıcıya gösterilmez
+    global _last_location
+    _last_location = ""
+    loc_match = _LOC_TAG_RE.search(final_text)
+    if loc_match:
+        _last_location = loc_match.group(1).strip()
+        final_text = final_text[: loc_match.start()] + final_text[loc_match.end() :]
+        final_text = final_text.strip()
 
     yield from _stream_chunks(final_text)
