@@ -26,6 +26,7 @@ import gradio as gr  # noqa: E402
 from chat import chat_skywise  # noqa: E402
 from ui_theme import (  # noqa: E402
     CUSTOM_CSS,
+    render_map_panel,
     render_panel_placeholder,
     render_weather_panel,
     weather_to_theme,
@@ -36,14 +37,15 @@ from tools.weather import (  # noqa: E402
     get_weather,
     get_weather_by_coords,
 )
+from tools.venue import clear_last_venues, get_last_venues  # noqa: E402
 
 DEFAULT_CITY = os.getenv("DEFAULT_CITY", "Istanbul")
 
 ORNEK_SORULAR = [
     "Bugün İstanbul'da hava nasıl, ne yapabilirim?",
     "Ankara'da iç mekân aktiviteleri öner",
-    "Antalya'da plaj ve yüzme için bugün uygun mu?",
-    "Eskişehir'de bu hafta sonu için müze önerin var mı?",
+    "What can I do in Paris today?",
+    "Recommend a museum in London",
 ]
 
 KARSILAMA_HTML = """
@@ -75,10 +77,10 @@ THEME_JS = "(t) => { document.body.dataset.theme = t || 'clear-day'; }"
 
 
 def respond(user_message: str, history: list[dict]):
-    """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state)."""
+    """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel)."""
     user_message = (user_message or "").strip()
     if not user_message:
-        yield gr.update(), "", gr.update(), gr.update(), gr.update()
+        yield gr.update(), "", gr.update(), gr.update(), gr.update(), gr.update()
         return
 
     history = list(history or [])
@@ -86,31 +88,49 @@ def respond(user_message: str, history: list[dict]):
     history.append({"role": "assistant", "content": ""})
 
     # Kullanıcı mesajı anında görünsün; boş durum kartları kaybolsun
-    yield gr.update(value=history, visible=True), "", gr.update(visible=False), gr.update(), gr.update()
+    yield gr.update(value=history, visible=True), "", gr.update(visible=False), gr.update(), gr.update(), gr.update()
 
     convo_for_agent = history[:-1]
     clear_last_weather()
+    clear_last_venues()
     panel_sent = False
+    map_sent = False
 
     try:
         for partial in chat_skywise(convo_for_agent):
             history[-1]["content"] = partial
             weather = get_last_weather()
+            venues = get_last_venues()
+
             if weather is not None and not panel_sent:
                 panel_sent = True
-                yield history, "", gr.update(), render_weather_panel(weather), weather_to_theme(weather)
+                yield history, "", gr.update(), render_weather_panel(weather), weather_to_theme(weather), gr.update()
+            elif venues and not map_sent:
+                map_sent = True
+                map_html = render_map_panel(venues)
+                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=bool(map_html))
             else:
-                yield history, "", gr.update(), gr.update(), gr.update()
+                yield history, "", gr.update(), gr.update(), gr.update(), gr.update()
+
+        # Son iterasyonda harita henüz gönderilmediyse gönder
+        if not map_sent:
+            venues = get_last_venues()
+            if venues:
+                map_html = render_map_panel(venues)
+                if map_html:
+                    yield history, "", gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True)
+
     except ValueError as e:
         history[-1]["content"] = f"> ⚠️ {e}"
-        yield history, "", gr.update(), gr.update(), gr.update()
+        yield history, "", gr.update(), gr.update(), gr.update(), gr.update()
     except Exception as e:
         history[-1]["content"] = f"> ⚠️ Bir hata oluştu: {e}"
-        yield history, "", gr.update(), gr.update(), gr.update()
+        yield history, "", gr.update(), gr.update(), gr.update(), gr.update()
 
 
 def clear_chat():
-    return gr.update(value=[], visible=False), gr.update(visible=True), ""
+    clear_last_venues()
+    return gr.update(value=[], visible=False), gr.update(visible=True), "", gr.update(value="", visible=False)
 
 
 def load_default_city():
@@ -153,6 +173,7 @@ with gr.Blocks(
     with gr.Row(elem_classes="main-row"):
         with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
             weather_panel = gr.HTML(render_panel_placeholder("Hava durumu yükleniyor..."))
+            map_panel = gr.HTML(value="", visible=False)
 
         with gr.Column(scale=5, elem_classes="chat-surface"):
             with gr.Column(visible=True, elem_classes="empty-state") as empty_state:
@@ -199,13 +220,13 @@ with gr.Blocks(
     theme_state = gr.Textbox(visible=False, elem_id="theme-state")
     geo_coords = gr.Textbox(visible=False, elem_id="geo-coords")
 
-    OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state]
+    OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel]
 
     textbox.submit(respond, [textbox, chatbot], OUTPUTS, api_name=False)
     send_btn.click(respond, [textbox, chatbot], OUTPUTS, api_name=False)
     for sug in (sug1, sug2, sug3, sug4):
         sug.click(respond, [sug, chatbot], OUTPUTS, api_name=False)
-    clear_btn.click(clear_chat, None, [chatbot, empty_state, textbox], api_name=False)
+    clear_btn.click(clear_chat, None, [chatbot, empty_state, textbox, map_panel], api_name=False)
 
     theme_state.change(None, theme_state, None, js=THEME_JS, api_name=False)
 

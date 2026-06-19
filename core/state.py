@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class PlannedCall(TypedDict):
-    tool: Literal["current_weather", "forecast", "comfort", "venue_search"]
+    tool: Literal["current_weather", "forecast", "comfort", "venue_search", "uv_index"]
     args: dict
 
 
@@ -23,7 +23,9 @@ class Evaluation(TypedDict):
 class SkyWiseState(TypedDict, total=False):
     city: str
     preferences: str
+    language: str
     weather: dict
+    uv: dict
     weather_summary: str
     forecast: str
     comfort: str
@@ -37,7 +39,7 @@ class SkyWiseState(TypedDict, total=False):
 
 
 class PlannerCall(BaseModel):
-    tool: Literal["current_weather", "forecast", "comfort", "venue_search"]
+    tool: Literal["current_weather", "forecast", "comfort", "venue_search", "uv_index"]
     args: dict = Field(default_factory=dict)
 
 

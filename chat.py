@@ -10,8 +10,9 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 
 from core.llms import evaluator_llm, react_llm
-from core.prompts import CHAT_SYSTEM_PROMPT, SUPERVISOR_SYSTEM_PROMPT
+from core.prompts import get_prompt
 from core.graph import _parse_supervisor
+from tools.uv import get_uv_index
 from tools.venue import find_venues, format_venues_for_llm
 from tools.weather import (
     calculate_comfort_index,
@@ -20,43 +21,85 @@ from tools.weather import (
     get_weather,
 )
 
+# ---- Dil tespiti ----
+
+_TURKISH_CHARS = set("ğışçöüĞİŞÇÖÜ")
+_TURKISH_WORDS = {
+    "merhaba", "nasıl", "bugün", "hava", "istanbul", "ankara",
+    "ne", "için", "ben", "bir", "ve", "de", "da", "mi", "mu",
+    "var", "yok", "evet", "hayır", "lütfen", "teşekkür",
+}
+
+_current_language: str = "tr"
+
+
+def _detect_language(text: str) -> str:
+    if any(c in _TURKISH_CHARS for c in text):
+        return "tr"
+    words = set(text.lower().split())
+    if words & _TURKISH_WORDS:
+        return "tr"
+    return "en"
+
+
+def get_current_language() -> str:
+    return _current_language
+
 
 # ---- LangChain tool tanımları ----
 
 @tool
 def current_weather_tool(city: str) -> str:
-    """Verilen şehrin anlık hava durumunu döndürür."""
+    """Returns the current weather for the given city, including UV index and sunset time."""
     try:
-        return format_weather_summary(get_weather(city))
+        w = get_weather(city, lang=_current_language)
+        try:
+            uv = get_uv_index(city, lang=_current_language)
+        except Exception:
+            uv = None
+        return format_weather_summary(w, uv=uv, lang=_current_language)
     except (ValueError, ConnectionError) as e:
         return f"Hata: {e}"
 
 
 @tool
 def forecast_tool(city: str) -> str:
-    """Verilen şehrin 3 günlük hava tahminini döndürür."""
+    """Returns the 3-day weather forecast for the given city."""
     try:
-        return get_forecast(city, days=3)
+        return get_forecast(city, days=3, lang=_current_language)
     except (ValueError, ConnectionError) as e:
         return f"Hata: {e}"
 
 
 @tool
 def comfort_tool(temperature: float, humidity: int, wind_speed: float) -> str:
-    """Sıcaklık, nem ve rüzgar hızına göre dışarı aktivite için konfor analizi yapar."""
+    """Analyzes outdoor activity comfort based on temperature, humidity, and wind speed."""
     return calculate_comfort_index(temperature, humidity, wind_speed)
 
 
 @tool
 def venue_search_tool(city: str, category: str, radius_km: int = 5) -> str:
-    """Şehir etrafındaki gerçek mekânları bulur (OpenStreetMap).
-    category: müze, park, kafe, restoran, spor salonu, manzara, kütüphane,
-    sanat galerisi, alışveriş, plaj, sinema."""
+    """Finds real venues near a city (Google Places or OpenStreetMap).
+    category: müze/museum, park, kafe/cafe, restoran/restaurant, spor salonu/gym,
+    manzara/viewpoint, kütüphane/library, sanat galerisi/art gallery,
+    alışveriş/shopping mall, plaj/beach, sinema/cinema."""
     try:
         venues = find_venues(city, category, radius_km=radius_km)
-        return format_venues_for_llm(venues, category, city)
+        return format_venues_for_llm(venues, category, city, lang=_current_language)
     except (ValueError, ConnectionError) as e:
         return f"Hata: {e}"
+
+
+@tool
+def uv_tool(city: str) -> str:
+    """Returns the current UV index and sun protection advice for the given city."""
+    try:
+        uv = get_uv_index(city, lang=_current_language)
+        if _current_language == "en":
+            return f"UV Index: {uv['uv_index']} ({uv['uv_level_en']}) — {uv['uv_advice_en']}"
+        return f"UV İndeksi: {uv['uv_index']} ({uv['uv_level_tr']}) — {uv['uv_advice_tr']}"
+    except Exception as e:
+        return f"UV verisi alınamadı: {e}"
 
 
 # ---- ReAct worker ----
@@ -65,14 +108,22 @@ _RECOMMENDATION_TOOLS = {"current_weather_tool", "venue_search_tool"}
 
 _chat_worker = create_react_agent(
     react_llm,
-    tools=[current_weather_tool, forecast_tool, comfort_tool, venue_search_tool],
+    tools=[current_weather_tool, forecast_tool, comfort_tool, venue_search_tool, uv_tool],
 )
 
 
 # ---- Yardımcılar ----
 
 def _gradio_to_lc_messages(messages: list[dict]) -> list:
-    lc: list = [SystemMessage(content=CHAT_SYSTEM_PROMPT)]
+    global _current_language
+
+    # Dil tespiti: ilk kullanıcı mesajından
+    for m in messages:
+        if m.get("role") == "user" and (m.get("content") or "").strip():
+            _current_language = _detect_language(m["content"])
+            break
+
+    lc: list = [SystemMessage(content=get_prompt("chat", _current_language))]
     for m in messages:
         role = m.get("role")
         content = (m.get("content") or "").strip()
@@ -118,7 +169,7 @@ def _supervise_chat_turn(
 
     raw = evaluator_llm.invoke(
         [
-            SystemMessage(content=SUPERVISOR_SYSTEM_PROMPT),
+            SystemMessage(content=get_prompt("supervisor", _current_language)),
             HumanMessage(
                 content=(
                     f"Kullanıcı son mesajı:\n{user_block}\n\n"

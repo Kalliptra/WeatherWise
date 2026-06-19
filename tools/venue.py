@@ -3,21 +3,41 @@ from __future__ import annotations
 import math
 import os
 import time
+import urllib.parse
+from datetime import date
 from typing import Optional
 
 import requests
 from dotenv import load_dotenv
 
+from tools.cache import get_or_fetch
+
 load_dotenv()
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+PLACES_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+
+GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY")
+_USE_GOOGLE = bool(GOOGLE_PLACES_API_KEY)
 
 _NOMINATIM_MIN_INTERVAL_S = 1.05
 _last_nominatim_call_ts = 0.0
 
 _geocode_cache: dict[str, tuple[float, float]] = {}
 _venues_cache: dict[tuple[str, str, int], list[dict]] = {}
+
+_LAST_VENUES: list[dict] = []
+
+
+def get_last_venues() -> list[dict]:
+    return list(_LAST_VENUES)
+
+
+def clear_last_venues() -> None:
+    global _LAST_VENUES
+    _LAST_VENUES = []
+
 
 OSM_CATEGORIES: dict[str, list[tuple[str, str]]] = {
     "müze": [("tourism", "museum")],
@@ -59,6 +79,46 @@ OSM_CATEGORIES: dict[str, list[tuple[str, str]]] = {
     "cinema": [("amenity", "cinema")],
 }
 
+PLACES_TYPES: dict[str, str] = {
+    "müze": "museum",
+    "muze": "museum",
+    "museum": "museum",
+    "park": "park",
+    "bahçe": "park",
+    "bahce": "park",
+    "kafe": "cafe",
+    "cafe": "cafe",
+    "restoran": "restaurant",
+    "restaurant": "restaurant",
+    "yemek": "restaurant",
+    "spor salonu": "gym",
+    "spor": "gym",
+    "gym": "gym",
+    "fitness": "gym",
+    "manzara": "tourist_attraction",
+    "viewpoint": "tourist_attraction",
+    "seyir": "tourist_attraction",
+    "kütüphane": "library",
+    "kutuphane": "library",
+    "library": "library",
+    "sanat galerisi": "art_gallery",
+    "galeri": "art_gallery",
+    "gallery": "art_gallery",
+    "alışveriş": "shopping_mall",
+    "alisveris": "shopping_mall",
+    "mall": "shopping_mall",
+    "avm": "shopping_mall",
+    "yürüyüş": "tourist_attraction",
+    "yuruyus": "tourist_attraction",
+    "doğa": "park",
+    "doga": "park",
+    "trail": "tourist_attraction",
+    "plaj": "natural_feature",
+    "beach": "natural_feature",
+    "sinema": "movie_theater",
+    "cinema": "movie_theater",
+}
+
 
 def _user_agent() -> str:
     return os.getenv("NOMINATIM_USER_AGENT", "SkyWise-SEN4018/1.0")
@@ -72,6 +132,16 @@ def _normalize_category(category: str) -> list[tuple[str, str]]:
         if k in key or key in k:
             return tags
     return [("tourism", "attraction")]
+
+
+def _normalize_places_type(category: str) -> str:
+    key = category.strip().casefold()
+    if key in PLACES_TYPES:
+        return PLACES_TYPES[key]
+    for k, ptype in PLACES_TYPES.items():
+        if k in key or key in k:
+            return ptype
+    return "tourist_attraction"
 
 
 def _wait_for_nominatim_window() -> None:
@@ -142,22 +212,66 @@ def geocode_city(city: str, timeout: float = 10.0) -> tuple[float, float]:
     return lat, lon
 
 
-def find_venues(
-    city: str,
-    category: str,
-    radius_km: int = 5,
-    limit: int = 8,
-    timeout: float = 25.0,
-) -> list[dict]:
-    """Return mesafe-sıralı venue dict listesi: {name, type, lat, lon, distance_km}."""
-    cache_key = (city.strip().lower(), category.strip().lower(), int(radius_km))
-    if cache_key in _venues_cache:
-        return _venues_cache[cache_key][:limit]
+def _find_venues_google(lat: float, lon: float, place_type: str, radius_m: int, limit: int) -> list[dict]:
+    """Google Places Nearby Search ile venue listesi döndürür."""
+    params = {
+        "location": f"{lat},{lon}",
+        "radius": radius_m,
+        "type": place_type,
+        "key": GOOGLE_PLACES_API_KEY,
+    }
+    try:
+        resp = requests.get(PLACES_URL, params=params, timeout=15)
+    except requests.RequestException as e:
+        raise ConnectionError(f"Google Places erişim hatası: {e}") from e
 
-    lat, lon = geocode_city(city)
-    tags = _normalize_category(category)
-    query = _build_overpass_query(lat, lon, tags, radius_km * 1000)
+    if resp.status_code != 200:
+        raise ConnectionError(f"Google Places HTTP {resp.status_code}")
 
+    results = resp.json().get("results", [])
+    venues: list[dict] = []
+    seen: set[str] = set()
+
+    for r in results[:limit * 2]:
+        name = r.get("name", "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+
+        geometry = r.get("geometry", {}).get("location", {})
+        vlat = geometry.get("lat")
+        vlon = geometry.get("lng")
+        if vlat is None or vlon is None:
+            continue
+
+        rating = r.get("rating")
+        place_id = r.get("place_id", "")
+        dist = round(_haversine_km(lat, lon, vlat, vlon), 2)
+
+        maps_url = (
+            "https://www.google.com/maps/dir/?api=1"
+            f"&destination={urllib.parse.quote(name)}"
+            f"&destination_place_id={place_id}"
+        )
+
+        venues.append({
+            "name": name,
+            "type": place_type,
+            "lat": vlat,
+            "lon": vlon,
+            "distance_km": dist,
+            "rating": rating,
+            "place_id": place_id,
+            "maps_url": maps_url,
+        })
+
+    venues.sort(key=lambda v: v["distance_km"])
+    return venues[:limit]
+
+
+def _find_venues_overpass(lat: float, lon: float, tags: list[tuple[str, str]], radius_m: int, limit: int, timeout: float = 25.0) -> list[dict]:
+    """Overpass API (OSM) ile venue listesi döndürür — Google Places yoksa fallback."""
+    query = _build_overpass_query(lat, lon, tags, radius_m)
     try:
         resp = requests.post(
             OVERPASS_URL,
@@ -189,30 +303,75 @@ def find_venues(
             (f"{k}={el_tags[k]}" for k, _ in tags if k in el_tags),
             "venue",
         )
-        venues.append(
-            {
-                "name": name,
-                "type": vtype,
-                "lat": vlat,
-                "lon": vlon,
-                "distance_km": round(_haversine_km(lat, lon, vlat, vlon), 2),
-            }
-        )
+        venues.append({
+            "name": name,
+            "type": vtype,
+            "lat": vlat,
+            "lon": vlon,
+            "distance_km": round(_haversine_km(lat, lon, vlat, vlon), 2),
+            "rating": None,
+            "place_id": None,
+            "maps_url": f"https://www.google.com/maps/search/{urllib.parse.quote(name)}",
+        })
 
     venues.sort(key=lambda v: v["distance_km"])
-    _venues_cache[cache_key] = venues
     return venues[:limit]
 
 
-def format_venues_for_llm(venues: list[dict], category: str, city: str) -> str:
-    """Compact Türkçe blok. Boşsa kullanıcı dostu mesaj döner."""
+def find_venues(
+    city: str,
+    category: str,
+    radius_km: int = 5,
+    limit: int = 8,
+    timeout: float = 25.0,
+) -> list[dict]:
+    """Mesafe-sıralı venue dict listesi döndürür."""
+    global _LAST_VENUES
+
+    cache_key = (city.strip().lower(), category.strip().lower(), int(radius_km))
+    if cache_key in _venues_cache:
+        result = _venues_cache[cache_key][:limit]
+        _LAST_VENUES = result
+        return result
+
+    today = date.today().isoformat()
+    file_cache_key = (f"venues_{category.lower()}", city.lower(), today)
+
+    lat, lon = geocode_city(city)
+    radius_m = radius_km * 1000
+
+    def _fetch():
+        if _USE_GOOGLE:
+            place_type = _normalize_places_type(category)
+            return _find_venues_google(lat, lon, place_type, radius_m, limit)
+        else:
+            tags = _normalize_category(category)
+            return _find_venues_overpass(lat, lon, tags, radius_m, limit, timeout)
+
+    venues = get_or_fetch(file_cache_key, _fetch)
+    _venues_cache[cache_key] = venues
+    _LAST_VENUES = venues[:limit]
+    return venues[:limit]
+
+
+def format_venues_for_llm(venues: list[dict], category: str, city: str, lang: str = "tr") -> str:
+    """LLM için formatlanmış venue bloğu. Rating ve rota linki içerir."""
     if not venues:
+        if lang == "en":
+            return f"No venues found for '{category}' near {city}."
         return f"{city} çevresinde '{category}' kategorisinde uygun mekân bulunamadı."
 
-    header = f"Yakındaki '{category}' önerileri ({city}):"
-    lines = [
-        f"- {v['name']} ({v['type']}, ~{v['distance_km']}km)" for v in venues
-    ]
+    if lang == "en":
+        header = f"Nearby '{category}' suggestions ({city}):"
+    else:
+        header = f"Yakındaki '{category}' önerileri ({city}):"
+
+    lines = []
+    for v in venues:
+        rating_str = f", ⭐{v['rating']}" if v.get("rating") else ""
+        maps_str = f" → [Rota]({v['maps_url']})" if v.get("maps_url") else ""
+        lines.append(f"- {v['name']} ({v['type']}, ~{v['distance_km']}km{rating_str}){maps_str}")
+
     return header + "\n" + "\n".join(lines)
 
 

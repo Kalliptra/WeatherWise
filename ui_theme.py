@@ -112,7 +112,7 @@ ICONS = {
 
 # ---- Panel HTML ------------------------------------------------------------
 
-def render_weather_panel(weather: dict) -> str:
+def render_weather_panel(weather: dict, uv=None) -> str:
     theme = weather_to_theme(weather)
     icon = ICONS.get(theme, ICONS["clear-day"])
     temp = round(weather.get("temperature", 0))
@@ -122,6 +122,21 @@ def render_weather_panel(weather: dict) -> str:
     city = weather.get("city", "")
     country = weather.get("country", "")
     place = f"{city}, {country}" if country else city
+
+    sunset_str = weather.get("sunset_str")
+    uv_level = (uv or {}).get("uv_level_tr") or (uv or {}).get("uv_level_en")
+    uv_index = (uv or {}).get("uv_index")
+
+    meta_parts = []
+    if sunset_str:
+        meta_parts.append(f"🌅 {sunset_str}")
+    if uv_index is not None and uv_level:
+        meta_parts.append(f"☀ UV {uv_index} ({uv_level})")
+    meta_html = (
+        f'<div class="wx-meta">{"&nbsp;&nbsp;|&nbsp;&nbsp;".join(meta_parts)}</div>'
+        if meta_parts else ""
+    )
+
     return (
         '<div class="wx-panel">'
         f'<div class="wx-icon">{icon}</div>'
@@ -129,8 +144,55 @@ def render_weather_panel(weather: dict) -> str:
         f'<div class="wx-feels">Hissedilen {feels}°</div>'
         f'<div class="wx-cond">{condition}</div>'
         f'<div class="wx-city">{place}</div>'
+        f"{meta_html}"
         "</div>"
     )
+
+
+def render_map_panel(venues: list[dict]) -> str:
+    """Leaflet.js haritası — venue listesi için marker'lar ve rota linkleri içerir."""
+    if not venues:
+        return ""
+
+    valid = [v for v in venues if v.get("lat") and v.get("lon")]
+    if not valid:
+        return ""
+
+    center_lat = sum(v["lat"] for v in valid) / len(valid)
+    center_lon = sum(v["lon"] for v in valid) / len(valid)
+
+    markers_js = ""
+    for v in valid:
+        name = v["name"].replace("'", "\\'").replace('"', '\\"')
+        rating = f" ⭐{v['rating']}" if v.get("rating") else ""
+        maps_url = v.get("maps_url", "")
+        popup = f"{name}{rating}"
+        if maps_url:
+            popup += f'<br><a href=\\"{maps_url}\\" target=\\"_blank\\" style=\\"color:#4fa3c7;font-weight:600\\">🗺 Rota Al</a>'
+        markers_js += (
+            f"L.marker([{v['lat']}, {v['lon']}])"
+            f".addTo(map)"
+            f".bindPopup('{popup}');\n"
+        )
+
+    return f"""
+<div style="margin-top:14px;">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div id="skywise-map" style="height:240px;border-radius:16px;overflow:hidden;border:1px solid rgba(0,0,0,0.12);"></div>
+<script>
+setTimeout(function() {{
+  if (typeof L === 'undefined') return;
+  if (document.getElementById('skywise-map')._leaflet_id) return;
+  var map = L.map('skywise-map').setView([{center_lat}, {center_lon}], 14);
+  L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+    attribution: '© OpenStreetMap contributors'
+  }}).addTo(map);
+  {markers_js}
+}}, 300);
+</script>
+</div>
+"""
 
 
 def render_panel_placeholder(message: str) -> str:
@@ -403,6 +465,13 @@ footer { display: none !important; }
     margin-top: 4px;
 }
 .wx-panel-empty .wx-cond { font-weight: 600; color: var(--ink-faint); }
+.wx-meta {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    margin-top: 10px;
+    letter-spacing: 0.04em;
+}
 
 /* ---- Chat yüzeyi ---- */
 .chat-surface {

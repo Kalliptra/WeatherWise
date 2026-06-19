@@ -8,8 +8,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 
 from core.llms import evaluator_llm, planner_llm, react_llm
-from core.prompts import RECOMMEND_SYSTEM_PROMPT, SUPERVISOR_SYSTEM_PROMPT, PLANNER_SYSTEM_PROMPT
+from core.prompts import get_prompt
 from core.state import Evaluation, PlannedCall, PlannerOutput, SkyWiseState
+from tools.uv import get_uv_index
 from tools.venue import find_venues, format_venues_for_llm
 from tools.weather import (
     calculate_comfort_index,
@@ -32,6 +33,10 @@ _structured_planner = planner_llm.with_structured_output(
 
 # ---- Yardımcı ----
 
+def _lang(state: SkyWiseState) -> str:
+    return state.get("language", "tr")
+
+
 def _state_summary(state: SkyWiseState) -> str:
     parts = []
     if state.get("weather_summary"):
@@ -42,6 +47,9 @@ def _state_summary(state: SkyWiseState) -> str:
         parts.append("TAHMİN TOPLANDI:\n" + state["forecast"])
     if state.get("comfort"):
         parts.append("KONFOR: " + state["comfort"])
+    if state.get("uv"):
+        uv = state["uv"]
+        parts.append(f"UV: {uv['uv_index']} ({uv['uv_level_tr']}) — {uv['uv_advice_tr']}")
     venues = state.get("venues") or {}
     if venues:
         parts.append("MEKÂNLAR TOPLANDI: " + ", ".join(venues.keys()))
@@ -74,6 +82,7 @@ def plan_node(state: SkyWiseState) -> dict:
     iteration = state.get("iteration", 0) + 1
     history = state.get("history") or []
     last_feedback = history[-1] if history else ""
+    lang = _lang(state)
 
     human = (
         f"Şehir: {state['city']}\n"
@@ -85,7 +94,7 @@ def plan_node(state: SkyWiseState) -> dict:
 
     result: PlannerOutput = _structured_planner.invoke(
         [
-            SystemMessage(content=PLANNER_SYSTEM_PROMPT),
+            SystemMessage(content=get_prompt("planner", lang)),
             HumanMessage(content=human),
         ]
     )
@@ -102,11 +111,13 @@ def plan_node(state: SkyWiseState) -> dict:
 
 def execute_node(state: SkyWiseState) -> dict:
     plan = state.get("plan") or []
+    lang = _lang(state)
     out: dict = {}
     venues: dict[str, str] = dict(state.get("venues") or {})
     errors: list[str] = []
 
     weather_obj = state.get("weather")
+    uv_obj = state.get("uv")
     forecast_str = state.get("forecast")
     comfort_str = state.get("comfort")
     weather_summary = state.get("weather_summary")
@@ -117,16 +128,27 @@ def execute_node(state: SkyWiseState) -> dict:
         try:
             if name == "current_weather":
                 city = args.get("city") or state["city"]
-                w = get_weather(city)
+                w = get_weather(city, lang=lang)
                 weather_obj = w
-                weather_summary = format_weather_summary(w)
+                # UV fetch alongside weather (failure is non-blocking)
+                if uv_obj is None:
+                    try:
+                        uv_obj = get_uv_index(city, lang=lang)
+                    except Exception:
+                        pass
+                weather_summary = format_weather_summary(w, uv=uv_obj, lang=lang)
                 if not comfort_str:
                     comfort_str = calculate_comfort_index(
                         w["temperature"], w["humidity"], w["wind_speed"]
                     )
+            elif name == "uv_index":
+                city = args.get("city") or state["city"]
+                uv_obj = get_uv_index(city, lang=lang)
+                if weather_obj is not None:
+                    weather_summary = format_weather_summary(weather_obj, uv=uv_obj, lang=lang)
             elif name == "forecast":
                 city = args.get("city") or state["city"]
-                forecast_str = get_forecast(city, days=3)
+                forecast_str = get_forecast(city, days=3, lang=lang)
             elif name == "comfort":
                 if weather_obj is not None:
                     temperature = args.get("temperature", weather_obj["temperature"])
@@ -142,12 +164,14 @@ def execute_node(state: SkyWiseState) -> dict:
                 category = args.get("category", "attraction")
                 radius_km = int(args.get("radius_km", 5))
                 vlist = find_venues(city, category, radius_km=radius_km)
-                venues[category] = format_venues_for_llm(vlist, category, city)
+                venues[category] = format_venues_for_llm(vlist, category, city, lang=lang)
         except (ValueError, ConnectionError, KeyError) as e:
             errors.append(f"[tool {name} hata]: {e}")
 
     if weather_obj is not None:
         out["weather"] = weather_obj
+    if uv_obj is not None:
+        out["uv"] = uv_obj
     if weather_summary:
         out["weather_summary"] = weather_summary
     if forecast_str:
@@ -165,6 +189,7 @@ def execute_node(state: SkyWiseState) -> dict:
 def recommend_node(state: SkyWiseState) -> dict:
     iteration = state.get("iteration", 1)
     history = state.get("history") or []
+    lang = _lang(state)
 
     sections = []
     if state.get("weather_summary"):
@@ -173,6 +198,16 @@ def recommend_node(state: SkyWiseState) -> dict:
         sections.append("TAHMİN:\n" + state["forecast"])
     if state.get("comfort"):
         sections.append(state["comfort"])
+
+    # Sunset context
+    weather = state.get("weather") or {}
+    mins_to_sunset = weather.get("minutes_to_sunset")
+    if mins_to_sunset is not None and 0 < mins_to_sunset < 60:
+        if lang == "en":
+            sections.append(f"SUNSET WARNING: Only {mins_to_sunset} minutes until sunset — great time for viewpoints!")
+        else:
+            sections.append(f"GÜN BATIMI UYARISI: Gün batımına {mins_to_sunset} dakika kaldı — manzara noktaları için ideal zaman!")
+
     venues = state.get("venues") or {}
     for cat, block in venues.items():
         sections.append(block)
@@ -188,7 +223,7 @@ def recommend_node(state: SkyWiseState) -> dict:
 
     raw = react_llm.invoke(
         [
-            SystemMessage(content=RECOMMEND_SYSTEM_PROMPT),
+            SystemMessage(content=get_prompt("recommend", lang)),
             HumanMessage(content=human),
         ]
     ).content
@@ -199,6 +234,7 @@ def recommend_node(state: SkyWiseState) -> dict:
 def evaluate_node(state: SkyWiseState) -> dict:
     weather_summary = state.get("weather_summary", "")
     venues_text = "\n\n".join((state.get("venues") or {}).values())
+    lang = _lang(state)
 
     user = (
         f"Hava durumu:\n{weather_summary}\n\n"
@@ -210,7 +246,7 @@ def evaluate_node(state: SkyWiseState) -> dict:
 
     raw = evaluator_llm.invoke(
         [
-            SystemMessage(content=SUPERVISOR_SYSTEM_PROMPT),
+            SystemMessage(content=get_prompt("supervisor", lang)),
             HumanMessage(content=user),
         ]
     ).content

@@ -1,10 +1,13 @@
 import os
+import time
 from collections import Counter
 from datetime import datetime
 from typing import Optional
 
 import requests
 from dotenv import load_dotenv
+
+from tools.cache import get_or_fetch
 
 load_dotenv()
 
@@ -40,9 +43,13 @@ def _remember(weather: dict) -> dict:
 
 def _parse_current(data: dict) -> dict:
     icon = data["weather"][0].get("icon", "01d")
+    sys = data.get("sys", {})
+    sunset_unix = sys.get("sunset")
+    now_ts = int(time.time())
+
     weather = {
         "city": data["name"],
-        "country": data["sys"]["country"],
+        "country": sys.get("country", ""),
         "temperature": round(data["main"]["temp"], 1),
         "feels_like": round(data["main"]["feels_like"], 1),
         "humidity": data["main"]["humidity"],
@@ -52,6 +59,9 @@ def _parse_current(data: dict) -> dict:
         "visibility": data.get("visibility", 10000) // 1000,  # metre → km
         "icon": icon,
         "is_night": icon.endswith("n"),
+        "sunset_unix": sunset_unix,
+        "sunset_str": datetime.fromtimestamp(sunset_unix).strftime("%H:%M") if sunset_unix else None,
+        "minutes_to_sunset": max(0, (sunset_unix - now_ts) // 60) if sunset_unix else None,
     }
 
     weather["is_rainy"] = weather["condition_id"] in range(200, 622)
@@ -63,7 +73,7 @@ def _parse_current(data: dict) -> dict:
     return weather
 
 
-def get_weather(city: str) -> dict:
+def get_weather(city: str, lang: str = "tr") -> dict:
     """
     Given a city name, returns a dict with weather details.
     Raises ValueError if city is not found.
@@ -71,21 +81,23 @@ def get_weather(city: str) -> dict:
     if _PROVIDER is not None:
         return _remember(_PROVIDER(city))
 
-    params = {
-        "q": city,
-        "appid": WEATHER_API_KEY,
-        "units": "metric",
-        "lang": "tr",
-    }
+    today = datetime.now().strftime("%Y-%m-%d")
 
-    response = requests.get(BASE_URL, params=params)
+    def _fetch():
+        params = {
+            "q": city,
+            "appid": WEATHER_API_KEY,
+            "units": "metric",
+            "lang": lang,
+        }
+        response = requests.get(BASE_URL, params=params)
+        if response.status_code == 404:
+            raise ValueError(f"Şehir bulunamadı: {city}")
+        if response.status_code != 200:
+            raise ConnectionError(f"Hava durumu verisi alınamadı. HTTP {response.status_code}")
+        return _parse_current(response.json())
 
-    if response.status_code == 404:
-        raise ValueError(f"Şehir bulunamadı: {city}")
-    if response.status_code != 200:
-        raise ConnectionError(f"Hava durumu verisi alınamadı. HTTP {response.status_code}")
-
-    return _remember(_parse_current(response.json()))
+    return _remember(get_or_fetch(("weather", city.lower(), today), _fetch))
 
 
 def get_weather_by_coords(lat: float, lon: float) -> dict:
@@ -109,45 +121,44 @@ def get_weather_by_coords(lat: float, lon: float) -> dict:
     return _remember(_parse_current(response.json()))
 
 
-def get_forecast(city: str, days: int = 3) -> str:
+def get_forecast(city: str, days: int = 3, lang: str = "tr") -> str:
     """
     Returns a plain-text daily forecast summary for the given city (up to `days` days).
     Raises ValueError if city is not found.
     """
-    params = {
-        "q": city,
-        "appid": WEATHER_API_KEY,
-        "units": "metric",
-        "lang": "tr",
-        "cnt": days * 8,  # 8 slots per day (3-hour intervals)
-    }
+    today = datetime.now().strftime("%Y-%m-%d")
 
-    response = requests.get(FORECAST_URL, params=params)
+    def _fetch():
+        params = {
+            "q": city,
+            "appid": WEATHER_API_KEY,
+            "units": "metric",
+            "lang": lang,
+            "cnt": days * 8,
+        }
+        response = requests.get(FORECAST_URL, params=params)
+        if response.status_code == 404:
+            raise ValueError(f"Şehir bulunamadı: {city}")
+        if response.status_code != 200:
+            raise ConnectionError(f"Tahmin verisi alınamadı. HTTP {response.status_code}")
 
-    if response.status_code == 404:
-        raise ValueError(f"Şehir bulunamadı: {city}")
-    if response.status_code != 200:
-        raise ConnectionError(f"Tahmin verisi alınamadı. HTTP {response.status_code}")
+        data = response.json()
+        by_date: dict[str, list] = {}
+        for slot in data["list"]:
+            d = datetime.fromtimestamp(slot["dt"]).strftime("%Y-%m-%d")
+            by_date.setdefault(d, []).append(slot)
 
-    data = response.json()
+        lines = []
+        for d, slots in list(by_date.items())[:days]:
+            temps = [s["main"]["temp"] for s in slots]
+            conditions = [s["weather"][0]["description"] for s in slots]
+            dominant = Counter(conditions).most_common(1)[0][0]
+            label = datetime.strptime(d, "%Y-%m-%d").strftime("%d %b")
+            lines.append(f"{label}: {round(min(temps), 1)}–{round(max(temps), 1)}°C, {dominant}")
 
-    # Group slots by calendar date
-    by_date: dict[str, list] = {}
-    for slot in data["list"]:
-        date = datetime.fromtimestamp(slot["dt"]).strftime("%Y-%m-%d")
-        by_date.setdefault(date, []).append(slot)
+        return "\n".join(lines) if lines else "Tahmin verisi bulunamadı."
 
-    lines = []
-    for date, slots in list(by_date.items())[:days]:
-        temps = [s["main"]["temp"] for s in slots]
-        conditions = [s["weather"][0]["description"] for s in slots]
-        dominant = Counter(conditions).most_common(1)[0][0]
-        label = datetime.strptime(date, "%Y-%m-%d").strftime("%d %b")
-        lines.append(
-            f"{label}: {round(min(temps), 1)}–{round(max(temps), 1)}°C, {dominant}"
-        )
-
-    return "\n".join(lines) if lines else "Tahmin verisi bulunamadı."
+    return get_or_fetch(("forecast", city.lower(), today), _fetch)
 
 
 def calculate_comfort_index(temperature: float, humidity: int, wind_speed: float) -> str:
@@ -185,18 +196,48 @@ def calculate_comfort_index(temperature: float, humidity: int, wind_speed: float
     return f"Konfor Analizi: {verdict}"
 
 
-def format_weather_summary(weather: dict) -> str:
+def format_weather_summary(weather: dict, uv: Optional[dict] = None, lang: str = "tr") -> str:
     """Returns a human-readable weather summary string for LLM prompt."""
-    return (
-        f"Şehir: {weather['city']}, {weather['country']}\n"
-        f"Sıcaklık: {weather['temperature']}°C (hissedilen {weather['feels_like']}°C)\n"
-        f"Nem: {weather['humidity']}%\n"
-        f"Rüzgar: {weather['wind_speed']} km/h\n"
-        f"Hava durumu: {weather['condition']}\n"
-        f"Görüş mesafesi: {weather['visibility']} km\n"
-        f"Yağışlı: {'Evet' if weather['is_rainy'] else 'Hayır'}\n"
-        f"Fırtınalı: {'Evet' if weather['is_stormy'] else 'Hayır'}"
-    )
+    if lang == "en":
+        lines = [
+            f"City: {weather['city']}, {weather['country']}",
+            f"Temperature: {weather['temperature']}°C (feels like {weather['feels_like']}°C)",
+            f"Humidity: {weather['humidity']}%",
+            f"Wind: {weather['wind_speed']} km/h",
+            f"Condition: {weather['condition']}",
+            f"Visibility: {weather['visibility']} km",
+            f"Rainy: {'Yes' if weather['is_rainy'] else 'No'}",
+            f"Stormy: {'Yes' if weather['is_stormy'] else 'No'}",
+        ]
+        if weather.get("sunset_str"):
+            lines.append(f"Sunset: {weather['sunset_str']}")
+            if weather.get("minutes_to_sunset") is not None:
+                mins = weather["minutes_to_sunset"]
+                if 0 < mins < 120:
+                    lines.append(f"Time to sunset: {mins} minutes")
+        if uv:
+            lines.append(f"UV Index: {uv['uv_index']} ({uv['uv_level_en']}) — {uv['uv_advice_en']}")
+    else:
+        lines = [
+            f"Şehir: {weather['city']}, {weather['country']}",
+            f"Sıcaklık: {weather['temperature']}°C (hissedilen {weather['feels_like']}°C)",
+            f"Nem: {weather['humidity']}%",
+            f"Rüzgar: {weather['wind_speed']} km/h",
+            f"Hava durumu: {weather['condition']}",
+            f"Görüş mesafesi: {weather['visibility']} km",
+            f"Yağışlı: {'Evet' if weather['is_rainy'] else 'Hayır'}",
+            f"Fırtınalı: {'Evet' if weather['is_stormy'] else 'Hayır'}",
+        ]
+        if weather.get("sunset_str"):
+            lines.append(f"Gün batımı: {weather['sunset_str']}")
+            if weather.get("minutes_to_sunset") is not None:
+                mins = weather["minutes_to_sunset"]
+                if 0 < mins < 120:
+                    lines.append(f"Gün batımına kalan süre: {mins} dakika")
+        if uv:
+            lines.append(f"UV İndeksi: {uv['uv_index']} ({uv['uv_level_tr']}) — {uv['uv_advice_tr']}")
+
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
