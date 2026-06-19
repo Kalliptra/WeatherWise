@@ -23,14 +23,14 @@ import os  # noqa: E402
 
 import gradio as gr  # noqa: E402
 
-from agent import chat_skywise  # noqa: E402
+from chat import chat_skywise  # noqa: E402
 from ui_theme import (  # noqa: E402
     CUSTOM_CSS,
     render_panel_placeholder,
     render_weather_panel,
     weather_to_theme,
 )
-from weather_tool import (  # noqa: E402
+from tools.weather import (  # noqa: E402
     clear_last_weather,
     get_last_weather,
     get_weather,

@@ -24,7 +24,7 @@ if str(REPO_ROOT) not in sys.path:
 from dotenv import load_dotenv  # noqa: E402
 from langchain_openai import ChatOpenAI  # noqa: E402
 
-import weather_tool  # noqa: E402
+import tools.weather as weather_tool  # noqa: E402
 from agent import run_skywise_traced  # noqa: E402
 from eval.metrics import (  # noqa: E402
     aggregate,
