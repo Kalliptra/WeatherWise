@@ -795,6 +795,34 @@ button.clear-btn:hover, .clear-btn button:hover {
     background: var(--surface-hover) !important;
 }
 
+/* ---- Sırada bekleyen mesajlar ---- */
+.queued-display-wrapper { padding: 4px 0 0; }
+.queued-display { display: flex; flex-direction: column; gap: 6px; }
+.queued-msg-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0 12px;
+}
+.queued-msg-text {
+    background: rgba(124, 58, 237, 0.15);
+    border: 1px solid rgba(124, 58, 237, 0.25);
+    border-radius: 18px 18px 4px 18px;
+    padding: 8px 14px;
+    color: var(--ink-soft);
+    font-size: 0.92em;
+    opacity: 0.7;
+    max-width: 70%;
+    word-break: break-word;
+}
+.queued-badge {
+    color: var(--ink-soft);
+    font-size: 0.72em;
+    opacity: 0.55;
+    white-space: nowrap;
+}
+
 /* ---- Boş durum (karşılama + öneri kartları) ---- */
 .empty-state {
     min-height: 430px;

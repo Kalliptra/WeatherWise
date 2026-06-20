@@ -105,20 +105,40 @@ FORCE_DARK_JS = """
 """
 
 
-def respond(user_message: str, history: list[dict]):
-    """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box)."""
-    user_message = (user_message or "").strip()
-    if not user_message:
-        yield gr.update(), "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+def render_queued_display(queued: list) -> str:
+    if not queued:
+        return ""
+    items = "".join(
+        f'<div class="queued-msg-row"><span class="queued-msg-text">{q}</span>'
+        f'<span class="queued-badge">🕒 Sırada</span></div>'
+        for q in queued
+    )
+    return f'<div class="queued-display">{items}</div>'
+
+
+def pre_submit(user_message: str, queued: list):
+    msg = (user_message or "").strip()
+    base = list(queued or [])
+    if not msg:
+        return "", base, render_queued_display(base)
+    new_queued = base + [msg]
+    return "", new_queued, render_queued_display(new_queued)
+
+
+def respond_from_history(history: list[dict], queued: list):
+    """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display)."""
+    if not queued:
         return
+
+    user_message = queued[0]
+    remaining = list(queued[1:])
+    qd = render_queued_display(remaining)
 
     history = list(history or [])
     history.append({"role": "user", "content": user_message})
     history.append({"role": "assistant", "content": TYPING_INDICATOR})
 
-    # Kullanıcı mesajı anında görünsün; boş durum kartları kaybolsun
-    # Harita sıfırlanmaz — sadece yeni venue geldiğinde güncellenir
-    yield gr.update(value=history, visible=True), "", gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(visible=False), [], gr.update()
+    yield gr.update(value=history, visible=True), gr.update(), gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(visible=False), [], gr.update(), remaining, qd
 
     convo_for_agent = history[:-1]
     clear_last_weather()
@@ -129,56 +149,60 @@ def respond(user_message: str, history: list[dict]):
 
     try:
         for partial in chat_skywise(convo_for_agent):
-            # İçerik gelene kadar üç nokta animasyonunu koru
             history[-1]["content"] = partial if partial else TYPING_INDICATOR
             weather = get_last_weather()
             venues = get_last_venues()
 
             if weather is not None and not panel_sent:
                 panel_sent = True
-                yield history, "", gr.update(), render_weather_panel(weather), weather_to_theme(weather), gr.update(), gr.update(), gr.update(), gr.update()
+                yield history, gr.update(), gr.update(), render_weather_panel(weather), weather_to_theme(weather), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd
             elif venues and not map_sent:
                 map_sent = True
                 map_html = render_map_panel(venues)
-                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=bool(map_html)), gr.update(visible=False), gr.update(), gr.update()
+                yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=bool(map_html)), gr.update(visible=False), gr.update(), gr.update(), remaining, qd
             else:
-                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+                yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd
 
-        # Son iterasyonda harita henüz gönderilmediyse gönder
         if not map_sent:
             venues = get_last_venues()
             if venues:
                 map_html = render_map_panel(venues)
                 if map_html:
-                    yield history, "", gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), gr.update(), gr.update()
+                    yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), gr.update(), gr.update(), remaining, qd
                     map_sent = True
 
-        # Harita gösterilmediyse lokasyon etiketleri kontrol et
         if not map_sent:
             locs = get_last_locations()
             if locs:
-                if len(locs) == 1:
-                    btn_label = f"📍 {locs[0]} konumunu haritada göster"
-                else:
-                    btn_label = f"📍 Bunları haritada göster ({len(locs)} yer)"
-                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), locs, gr.update()
+                btn_label = (
+                    f"📍 {locs[0]} konumunu haritada göster"
+                    if len(locs) == 1
+                    else f"📍 Bunları haritada göster ({len(locs)} yer)"
+                )
+                yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), locs, gr.update(), remaining, qd
 
-        # Streaming bitti — bağlama göre öneri üret ve placeholder'ı güncelle
         hint, suggestion = generate_next_suggestion(history)
         default_placeholder = "Mesajını yaz... (örn: \"Bugün İstanbul'da ne yapsam?\")"
         yield (
             gr.update(),
             gr.update(value="", placeholder=hint if hint else default_placeholder),
-            gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
             suggestion,
+            remaining,
+            qd,
         )
 
     except ValueError as e:
         history[-1]["content"] = f"> ⚠️ {e}"
-        yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd
     except Exception as e:
         history[-1]["content"] = f"> ⚠️ Bir hata oluştu: {e}"
-        yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd
 
 
 def clear_chat():
@@ -190,6 +214,8 @@ def clear_chat():
         "",
         gr.update(value="", visible=False),
         gr.update(visible=False),
+        "",
+        [],
         "",
     )
 
@@ -262,6 +288,7 @@ with gr.Blocks(
     )
 
     location_state = gr.State("")
+    queued_state = gr.State([])
 
     with gr.Row(elem_classes="main-row"):
         with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
@@ -290,6 +317,8 @@ with gr.Blocks(
                 avatar_images=(None, None),
             )
 
+            queued_display = gr.HTML(value="", elem_classes="queued-display-wrapper")
+
             with gr.Row(elem_classes="chat-input-row"):
                 textbox = gr.Textbox(
                     placeholder="Mesajını yaz... (örn: \"Bugün İstanbul'da ne yapsam?\")",
@@ -315,15 +344,18 @@ with gr.Blocks(
     geo_coords = gr.Textbox(visible=False, elem_id="geo-coords")
     suggestion_box = gr.Textbox(visible=False, elem_id="skywise-suggestion", interactive=False)
 
-    OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box]
+    RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display]
+    PRE_OUTPUTS = [textbox, queued_state, queued_display]
 
-    textbox.submit(respond, [textbox, chatbot], OUTPUTS, api_name=False)
-    send_btn.click(respond, [textbox, chatbot], OUTPUTS, api_name=False)
+    for trigger in (textbox.submit, send_btn.click):
+        (trigger(pre_submit, [textbox, queued_state], PRE_OUTPUTS, api_name=False)
+         .then(respond_from_history, [chatbot, queued_state], RESPOND_OUTPUTS, concurrency_limit=1, api_name=False))
     for sug in (sug1, sug2, sug3, sug4):
-        sug.click(respond, [sug, chatbot], OUTPUTS, api_name=False)
+        (sug.click(pre_submit, [sug, queued_state], PRE_OUTPUTS, api_name=False)
+         .then(respond_from_history, [chatbot, queued_state], RESPOND_OUTPUTS, concurrency_limit=1, api_name=False))
     clear_btn.click(
         clear_chat, None,
-        [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state],
+        [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display],
         api_name=False,
     )
     show_loc_btn.click(show_location_on_map, location_state, [map_panel, show_loc_btn], api_name=False)
@@ -336,4 +368,5 @@ with gr.Blocks(
 
 
 if __name__ == "__main__":
+    demo.queue(max_size=20)
     demo.launch(show_error=True, show_api=False, server_name="127.0.0.1")
