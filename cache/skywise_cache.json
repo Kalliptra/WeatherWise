@@ -1256,5 +1256,114 @@
         "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3n_uvVvzaSg_4Q-CyhzWv5NijtNjf9A4o744JhJkT76lDlHK84v-2o60ru9yfUe6Q22VKtizZBzg2gtNDkudKn1-OPM9TiClH-5bN2Adzro87zfDs2xtjcZOiaewyd3Bk_eYaPhxvIQakOQ7qbuXho_M0Ya93lQF7QFwqSqM3vhG5B2hAlawvso-1YIJyOcC7uS-WW_WyvX6cVSvLh7bahZOVXr221hHIHGMbt0lNVDrlzHe0zdkj5LXnANJLMpsUcgFv07jmxv1yjkRI-D_JUgc9392s0jjWiSOclNjnEU3A_RRyPbS6XYpZsEBjcrSM2udJbC3Gz2JRR8ukmlyje_b8VLIRU4OFyyG6LS5OuhZUF3zOkEkoFWIpmdaotBVDyK_o6fxfVhhf-DVAAzUffTFZRxhs6ftmqfve2fSbrk45Mo&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       }
     ]
+  },
+  "venues_museum|london|2026-06-21": {
+    "date": "2026-06-21",
+    "data": [
+      {
+        "name": "The National Gallery",
+        "type": "museum",
+        "lat": 51.50892899999999,
+        "lon": -0.128299,
+        "distance_km": 0.17,
+        "rating": 4.8,
+        "review_count": 61979,
+        "place_id": "ChIJeclqF84EdkgRtKAjTmWFr0I",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=The%20National%20Gallery&destination_place_id=ChIJeclqF84EdkgRtKAjTmWFr0I",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3k6UU6s9mE8ldULOJmiV6bBCaWi0RNINU8sr8iOGwXsFI0YwzeZa2agt3Cak_Q4CxWJEULU2QjLKIdngJN324tJXraJHAf6-ByauJpeVcP9D6B0e5H0a4w50PGE6UJs3z8vLJJOyB37Q-DS3YwQSkWTw-oEm6yLUIBDA_pmjcTUDD02g8WtdKGnpXyqh4p7t59gt2Bw7NeCGtNJlpPEN42GsPKtL66elMXtjiZmX7ZL-8MTOJrC9HwUDkUnoi7RbQwpU4XoOoD8PsQH9wog6lNgCj8-FdElDZON4__ZTaJwpxBWI9MlKF9_wSE9A121Bdfqn9uejv85I4CICnw5AzJ5dKhFyek7i6u00LYzUFCMPwtjRK8kIg4Pp3sex4CM_1Ma_EW2dA0qkjjHro6wbmoyKCAGNjZ40Ytf54zf10CKNA&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "National Portrait Gallery",
+        "type": "museum",
+        "lat": 51.5094236,
+        "lon": -0.1281216,
+        "distance_km": 0.22,
+        "rating": 4.7,
+        "review_count": 15540,
+        "place_id": "ChIJeclqF84EdkgRYkL4mtJ7rLM",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=National%20Portrait%20Gallery&destination_place_id=ChIJeclqF84EdkgRYkL4mtJ7rLM",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3n1MFCKmcfpZcvsYzwOULSS-cJlNyj4oeGZH1Hrlg4ksaBlF1D6hx62b5LeXR6-v4flmKpuDWbq_vJnvOdz9r9RYmfopBSndasDoxZeNnbqHW-0nKblFIE41BXoOXCIRk10IcjQok_DBmTqLBz9e38CEMd5OCGvzmFE8LmHu7zprDFaZ5z5YLMKvSoFegLlDe8eOczEOHihBykSbHT0miPdPswiUcq4qGLWittlBMMMRhKK8u2lgpa0ii_CIV01DzePneT6WITAAjjlF8TjzDwAgvmugK30QyXFmXTalX8vHQm82R_gBhqBF65eKfiO9rwbhalobZ6KSiUCiqIELmqSHckoJaPTqOhL_4FS04ue2hyA6toGr8nd7rRnlSu64CIjKoFAlAVjOlhCQxLd37O4oQen2KotsD5I9PzCmoHO9pNEMuTa9stt1lhFGA&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "The Household Cavalry Museum",
+        "type": "museum",
+        "lat": 51.5049111,
+        "lon": -0.1273704,
+        "distance_km": 0.28,
+        "rating": 4.5,
+        "review_count": 3389,
+        "place_id": "ChIJj8pl-M8EdkgRYHpGjyF-BKc",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=The%20Household%20Cavalry%20Museum&destination_place_id=ChIJj8pl-M8EdkgRYHpGjyF-BKc",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3lCxSJQekU1CrG4O_E6-wXMwU2Pg1BuZLRlPuBVnRLlowGhnUfrd55W3v5XOkvdcHNIOMKtIZiqSjE5YqAE3upSoEEzGk83ajkSjTry9IEkiTpo84gu3wgSNfH1BA8BhMctthL3lyea59zKEwpTW_1FFSiAoS4hA7vF4vsEYcCYD43w9v9A5y0DYwpDnb_O18Rs5XJjHTgktQTygz43xjfOMSm0_-81oMyanrsKKdcr1kClfVoRhS9p-VIvc0lKGKOEVBN25gcsIHCuNSRLNfBZZhpi-aFaOVG-tyW-an4k-UYkWFaIp0i4GVLES6EmVk1SF1Y0Wrb2hxia_ny9k_aTXWDdBJ_jUg04Wp77NJN5JiSkVuOnRJ1ALyxZyA5O2zxD65U7pHFK5ud7vWdng_ElfkD7LLnjv2Hy8Hw4FcBf4j8&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Churchill War Rooms",
+        "type": "museum",
+        "lat": 51.5021585,
+        "lon": -0.1293572,
+        "distance_km": 0.6,
+        "rating": 4.6,
+        "review_count": 15547,
+        "place_id": "ChIJq4lX1doEdkgR5JXPstgQjc0",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Churchill%20War%20Rooms&destination_place_id=ChIJq4lX1doEdkgR5JXPstgQjc0",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3kkIg_sXhAs3GlVVYRuy0tAOuELQMzmsHBW6zv72u8lxclQNz5scGoQ2D3PgHuuUuvVV6ZwcxrztfkuTF95n7JXCYs1nZ9kwgCmCvTSVGtsVRE3OfPYYoVWZ3xU4F4jJcUSEAH2rcG6JX775cHIaR4ZDuvitbk6Ryn4KJGKVGem8Mj1u4meVElwLGDqWDzuEeL-jmzBSYi3oDuVkgk99f0TCaSLzXdTDbpVcmtNEuiSF6-lQRnFMmtf6yxMD-8AIm-K4UrttgmQzcrjn08grjRACPlfgtsQGfE9AXlmRnevIbdEe6bbEVX1T_64t4k7tdEtJyH7JZDgrUFa928Lo_hFETRXs54osQSx1kLpZEAk-PUBiq2LHkmex9Gb-HU5tGwYQlBNcX1gJgsqlTzikNFcIBXbDaHGP49kHYEonV_BDw&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "London Transport Museum",
+        "type": "museum",
+        "lat": 51.5119031,
+        "lon": -0.1215852,
+        "distance_km": 0.65,
+        "rating": 4.4,
+        "review_count": 12969,
+        "place_id": "ChIJ4bF21K8FdkgRDXc6FiSVAzE",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=London%20Transport%20Museum&destination_place_id=ChIJ4bF21K8FdkgRDXc6FiSVAzE",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3lJ4sAC5DiQ7x2WitDMCGOkOFCv58bnGGsG2G9AjIMuV1P-eOKVTjZIrdDxS7iHmfKKEYKo0ajORVFq1omZ-FUJsRHxJQD721LSo_pXATDL_-RMigI-fMKY5Dln0ohVxYvLIAh_FT8nSm-6wbAFKxJm4J5OeLRzRTnKp7q5bN1tyr6WbpfgAxxTRgT6mMkoO1VGdgnAA-CCxGoMMUhcXHt9lQacKUNJERTfxlRpX-bIGfa0-NT7Ov7VWcDZoOafwzRwyQwLCen8Ex3v3uCgEFz_5xO82d5fpNwNXr--vQ3u4qxvg7yLB0GT7GwJdaYqP6Hbp2TGWxxzmdi0yheRQdy9DuulteUt6JPOM4uNb4uySYWuPdVsj1r08vdMEMu5pFF62J7AViPSOPUjhAp0D_la1HQVmwp6Fm6KYtyEQt2vlQ8cfD8ENp1_zoFUcsFm&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Sir John Soane's Museum",
+        "type": "museum",
+        "lat": 51.51703819999999,
+        "lon": -0.1174699,
+        "distance_km": 1.28,
+        "rating": 4.7,
+        "review_count": 5427,
+        "place_id": "ChIJaQQ3lEobdkgRmauadcnji9s",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Sir%20John%20Soane%27s%20Museum&destination_place_id=ChIJaQQ3lEobdkgRmauadcnji9s",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3lVxbVq1Tw_v-3jB_Nm64x70H942NTFDehc_and1jEZP28OFyi0Ud0RSL186APnktFro5sHcedt9awiBZ8K28U20OQLyaNhTmCLaNHiigPV3Wdmopf2Z8hRyqStvQKYyShaW-yKi4DviCzKd26Qp0fRty2H-SrbvZugeDVD4vVGrgPgRwzM5JAYGJecQnEWGhRTXr0mKGGUfj1yzy0UhXEiecPedb1Sg_7raRQkVc2X9K363nTLUM6gLvBi3SARpIyX-et6PPCGa7WUU6Xd7e8UXBu8M0hcoB6_zGhdZAIWPoOd_lBqwbVoohobQvHmCgIPxGx06hWDdqQAVHc1k3unn_kPQFVWM-5hG6hXWcRvu68xU_NlfRW-z6AUklMGO8h1jjq-GUH3O7KKuHb-8Grav4zlXJpzmLtL7IdGeXZ7FdRY&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "The British Museum",
+        "type": "museum",
+        "lat": 51.5194133,
+        "lon": -0.1269566,
+        "distance_km": 1.33,
+        "rating": 4.7,
+        "review_count": 173471,
+        "place_id": "ChIJB9OTMDIbdkgRp0JWbQGZsS8",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=The%20British%20Museum&destination_place_id=ChIJB9OTMDIbdkgRp0JWbQGZsS8",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3lKJNW19gyS_GnUX1phieKxIMJtqH5S1uoYB28_IhUjw16jotiQB4e91EhW3_kZmqtmAQS6K2TKxs44fEXgHbZIy7hdTDv6M6coEZS8GsoE5RKLAN-FdZgmm2gutDdd3DQlvA76QKw9JVhn2WpcZfmFlVRvadaKhY5MYHigDeBqEpcTjuau97Jlyy7RQxAhnmunK_DsGzH-Nj0KzehjwEp55drO_tdkzRbuMvNgRq0aJOW9MLvB_kSftM33efeAKowVAhNyQ8VgvX4mBlIrwlAeFh9AutQaT8AeZJiDZBjm-N8boT22zp4T-0JMRGzOualdr0gfYCIptCCeC5kZ5RWaOaaezwdcoKbIX6BBAkuu45zXKWfyZuUVu6L2H8ED6l1_dMQHYSq72FapmO6uyYXFSWDFMBgrxnzLj579sI__h3lSezxJdth-sypn8w&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Twist Museum",
+        "type": "museum",
+        "lat": 51.51527489999999,
+        "lon": -0.1431529,
+        "distance_km": 1.38,
+        "rating": 4.6,
+        "review_count": 5031,
+        "place_id": "ChIJqZLwP-UbdkgR3fNcCBoNLjk",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Twist%20Museum&destination_place_id=ChIJqZLwP-UbdkgR3fNcCBoNLjk",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3l54nBmQXh04gP9r0OfTGy9N9fqa-MrVwD6MmG3_SsGi6x0kCNKQubA-6x7glzAAuQnx-DOQzPSS1HACN0qQvyPWlC9Ibz1REbJLE2qoRmLFyi5WWVuZN2bNH3TknvapeTYNqRK0OgkuS98DvmGkMvWJCsoJ52ZddHnAvtcsdJK4ftPNDtf1IstHupBOW07kKst2oyTguH6QHTZ6KbzOt68anhgwFC3xt6iR2coyTc7xfV3jKMfzVv4L24WV4my5X6AmzSL8QKLTTRWPyn5TH7H6l9t4l2Aj0g4eBZUoV9XNXef5Ma1yaWCBM1NB8KXwdpM2vLyLCajkloKr9riRXoouJMPiatFlH6eRSnXh-ZOv3qHbmhpcHRBjqXnVdJSY0y6yVFRTLqPnvuT_oZyaazFjpmNIqH_vgU9kYxFAYkpHPOVbsc4oZHD5eaL5VH2&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      }
+    ]
   }
 }

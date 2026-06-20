@@ -34,8 +34,33 @@ _TURKISH_WORDS = {
 
 _current_language: str = "tr"
 _last_locations: list[str] = []
+_user_location: Optional[str] = None  # Kullanıcının bildirdiği güncel konum
 
 _LOC_TAG_RE = re.compile(r'\[LOC:([^\]]+)\]')
+
+# Kullanıcının "şu an buradayım" tarzı konum bildirimlerini yakalayan kalıplar.
+# Yakalanan grup şehir adıdır (büyük harfle başlamalı → yaygın kelimeleri eler).
+_LOC_UPDATE_PATTERNS = (
+    # TR: "İstanbul'dayım", "Ankara'dayim", "Berlin'deyim", "İzmir'deyim"
+    re.compile(r"\b([A-ZÇĞİÖŞÜ][\wçğıöşü]+)['’]?(?:de|da|te|ta)y[ıi]m\b", re.UNICODE),
+    # TR: "Berlin'e taşındım/geldim/vardım/ulaştım"
+    re.compile(
+        r"\b([A-ZÇĞİÖŞÜ][\wçğıöşü]+)['’]?[ae]\s+"
+        r"(?:taşındım|tasindim|geldim|vardım|vardim|ulaştım|ulastim|yerleştim|yerlestim)\b",
+        re.UNICODE,
+    ),
+    # TR: "konumum Berlin", "yeni konumum Berlin", "şu an Berlin'deyim" (üstte)
+    re.compile(r"konum(?:um)?\s+([A-ZÇĞİÖŞÜ][\wçğıöşü]+)", re.UNICODE),
+    # EN: "I'm in Berlin", "I am now in Berlin", "currently in Berlin"
+    re.compile(r"\b(?:i['’]?m|i am|currently|now)\s+(?:now\s+)?in\s+([A-Z][\w]+)", re.IGNORECASE),
+    # EN: "I moved to Berlin", "arrived in Berlin", "relocated to Berlin"
+    re.compile(
+        r"\b(?:moved to|relocated to|arrived in|arrived at|traveled to|travelled to)\s+([A-Z][\w]+)",
+        re.IGNORECASE,
+    ),
+    # EN: "my location is Berlin"
+    re.compile(r"\bmy location is\s+([A-Z][\w]+)", re.IGNORECASE),
+)
 
 
 def get_last_locations() -> list[str]:
@@ -119,15 +144,47 @@ def _extract_city_from_message(text: str) -> Optional[str]:
     return None
 
 
+def _detect_location_update(text: str) -> Optional[str]:
+    """Mesaj bir konum bildirimi içeriyorsa yeni şehri döner, yoksa None."""
+    for pattern in _LOC_UPDATE_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            city = m.group(1).strip()
+            if city and city.lower() not in _COMMON_STOPWORDS:
+                return city
+    return None
+
+
+def _location_update_reply(city: str) -> Optional[str]:
+    """Yeni konum için kısa onay + güncel hava durumu özeti üretir.
+
+    Hava durumu alınamazsa None döner (normal akışa düşülür).
+    """
+    try:
+        w = get_weather(city, lang=_current_language)
+    except (ValueError, ConnectionError):
+        return None
+    try:
+        uv = get_uv_index(city, lang=_current_language)
+    except Exception:
+        uv = None
+    summary = format_weather_summary(w, uv=uv, lang=_current_language)
+    if _current_language == "en":
+        intro = f"📍 Got it — you're now in **{city}**. Here's the current weather:\n\n"
+    else:
+        intro = f"📍 Anlaşıldı, şu an **{city}** konumundasın. Güncel hava durumu:\n\n"
+    return intro + summary
+
+
 def _handle_weather_only(text: str, messages: list[dict]) -> Optional[str]:
     """Doğrudan hava durumu sorgusunu ReAct'ı atlatarak yanıtlar.
 
     Şehir bulunamazsa None döner ve ReAct'a düşülür.
     """
-    # Önce mevcut konum listesine bak, yoksa mesajdan çıkarmayı dene
-    city: Optional[str] = _last_locations[0] if _last_locations else None
+    # Mesajda açıkça şehir varsa onu kullan; yoksa kullanıcı konumu, sonra map
+    city: Optional[str] = _extract_city_from_message(text)
     if not city:
-        city = _extract_city_from_message(text)
+        city = _user_location or (_last_locations[0] if _last_locations else None)
     if not city:
         # Geçmişteki kullanıcı mesajlarında şehir ara
         for m in reversed(messages[:-1]):
@@ -359,6 +416,24 @@ def chat_skywise(messages: list[dict]) -> Iterator[str]:
     last_user = _last_user_text(messages)
     has_history = any(m.get("role") == "assistant" for m in messages)
     intent = _classify_intent(last_user, _current_language, has_history)
+
+    # Konum güncellemesi tespiti → sol paneldeki hava durumunu anında yenile.
+    # get_weather() çağrısı _LAST_WEATHER'ı set eder; UI bunu okuyup paneli günceller.
+    global _user_location
+    updated_city = _detect_location_update(last_user)
+    if updated_city:
+        try:
+            get_weather(updated_city, lang=_current_language)
+            _user_location = updated_city
+        except (ValueError, ConnectionError):
+            updated_city = None
+
+    # Yalnızca konum bildirimi (başka istek yok) → kısa onay + hava özeti
+    if updated_city and intent == "other":
+        reply = _location_update_reply(updated_city)
+        if reply is not None:
+            yield from _stream_chunks(reply)
+            return
 
     # weather_only fast-path: ReAct'ı atla
     if intent == "weather_only":
