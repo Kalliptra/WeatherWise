@@ -76,6 +76,11 @@ async () => {
 
 THEME_JS = "(t) => { document.body.dataset.theme = t || 'clear-day'; }"
 
+# Yanıt beklenirken gösterilen "yazıyor..." üç nokta animasyonu
+TYPING_INDICATOR = (
+    '<div class="typing-indicator"><span></span><span></span><span></span></div>'
+)
+
 # Gradio'nun kendi koyu modunu zorla (dahili bileşenler de koyuya uysun) +
 # tema set edilene kadar varsayılan accent görünsün
 FORCE_DARK_JS = """
@@ -97,7 +102,7 @@ def respond(user_message: str, history: list[dict]):
 
     history = list(history or [])
     history.append({"role": "user", "content": user_message})
-    history.append({"role": "assistant", "content": ""})
+    history.append({"role": "assistant", "content": TYPING_INDICATOR})
 
     # Kullanıcı mesajı anında görünsün; boş durum kartları kaybolsun
     # Harita sıfırlanmaz — sadece yeni venue geldiğinde güncellenir
@@ -112,7 +117,8 @@ def respond(user_message: str, history: list[dict]):
 
     try:
         for partial in chat_skywise(convo_for_agent):
-            history[-1]["content"] = partial
+            # İçerik gelene kadar üç nokta animasyonunu koru
+            history[-1]["content"] = partial if partial else TYPING_INDICATOR
             weather = get_last_weather()
             venues = get_last_venues()
 

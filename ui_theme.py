@@ -913,6 +913,28 @@ button.suggestion-btn:hover {
 .footer-note strong { color: var(--ink-faint) !important; font-weight: 600 !important; }
 .footer-note hr { display: none; }
 
+/* ---- "Yazıyor..." üç nokta animasyonu ---- */
+.typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 2px;
+}
+.typing-indicator span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent, #7c5cff);
+    opacity: 0.45;
+    animation: typing-bounce 1.25s ease-in-out infinite;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.18s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+    30% { transform: translateY(-5px); opacity: 1; }
+}
+
 /* ---- Mobil ---- */
 @media (max-width: 860px) {
     .main-row { flex-direction: column !important; }

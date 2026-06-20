@@ -1000,5 +1000,261 @@
       "uv_advice_tr": "Güneş kremi gerekmez.",
       "uv_advice_en": "No sunscreen needed."
     }
+  },
+  "weather|nancy|2026-06-21": {
+    "date": "2026-06-21",
+    "data": {
+      "city": "Arrondissement de Nancy",
+      "country": "FR",
+      "temperature": 21.7,
+      "feels_like": 21.9,
+      "humidity": 78,
+      "wind_speed": 7.5,
+      "condition": "kapalı",
+      "condition_id": 804,
+      "visibility": 10,
+      "icon": "04n",
+      "is_night": true,
+      "sunset_unix": 1781984478,
+      "sunset_str": "22:41",
+      "minutes_to_sunset": 0,
+      "is_rainy": false,
+      "is_stormy": false,
+      "is_snowy": false,
+      "is_foggy": false,
+      "is_clear": false
+    }
+  },
+  "uv|nancy|2026-06-21": {
+    "date": "2026-06-21",
+    "data": {
+      "uv_index": 0,
+      "uv_level_tr": "düşük",
+      "uv_level_en": "low",
+      "uv_advice_tr": "Güneş kremi gerekmez.",
+      "uv_advice_en": "No sunscreen needed."
+    }
+  },
+  "venues_spor salonu|nancy|2026-06-21": {
+    "date": "2026-06-21",
+    "data": [
+      {
+        "name": "CrossFit Nancy",
+        "type": "gym",
+        "lat": 48.69706069999999,
+        "lon": 6.189157199999999,
+        "distance_km": 0.56,
+        "rating": 4.9,
+        "review_count": 62,
+        "place_id": "ChIJn_ooahSYlEcRDQGkHsT1DqM",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=CrossFit%20Nancy&destination_place_id=ChIJn_ooahSYlEcRDQGkHsT1DqM",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3mr6tqj2irVxX7LrMt2qwNNCHss7RaBPemHvbQYoNR2hLoAZrs73pqAnlofKbkM7TgSty7U3CBk932jKelTXP1i4rd2yAeJ2-_ET486IGUmTwiQpx9uqvJLJMU8M-eIO0o-IkGrJzIXAAeRr1eqX0AZ0X-TAqSZDrlPU2EAHE17_cWILaFAWTzZs7RQZcwU_ZRXoKlKA0WYfne6ZZHnxvmPMOr4k0G4ux7b4Cvg0rrEUm5EDtxZlMMzdn5s3RBfrTQ3C500oRjMrGz6-gbVR0fG5hvtf6CefljQAnP3fzEkVXrL0eu_IvSH7oDUr5HJGKx8waErmFB3TKkwkwjZj-XdJHqWH5LJ80v3NFaIcoD8uw4GRV4RR_nLlzJktkmOCbZe6jcjBODa8FybUSRYZ_kvBngDD0qw1yF08eEFEKU8e70b&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Keepcool Nancy Gare",
+        "type": "gym",
+        "lat": 48.6893755,
+        "lon": 6.1772595,
+        "distance_km": 0.66,
+        "rating": 4.8,
+        "review_count": 744,
+        "place_id": "ChIJcUte2bGZlEcRG9khWuU3Kic",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Keepcool%20Nancy%20Gare&destination_place_id=ChIJcUte2bGZlEcRG9khWuU3Kic",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3mZwGhiDpGc4kdVdHwhXIpauKWLvbQYaO1XeLy4c0BNJN0jLiyaqvAdEIH4ZrLAR7DtSn3SpCaGJT61NVaYnEtEbYhfelPbyKlN26UD5jP7uFyanmrJiuCu3hxeOr4DQ673CHeJ_SgeA3CTz8OmGuNJphMUkjS49MEuJ-ZwZSwTenJ6OdH3zDbe-xDjdTUIa95D9caE-UCSKjxwitpjEhhyO4uPo01b7iKilY9_ais5TAuiaR7Oxx_hhhY3YD5a8hs0r9UBw0cDpAN5lrzbxfz5bbKNy8737aw9lr0u1BenBf3j8ARoF18WpuW2lc_mONsvse2vulZbqEI-yFdrb9iQen0lIot_PCM16TJMy-Vi5EcQJC4Tc4E1QdO-zG9p7BVBjqIJxPWoyI0-3oadIKDLNKgugSjOPCq9G0IHhJbmqeAO&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Basic-Fit",
+        "type": "gym",
+        "lat": 48.6876748,
+        "lon": 6.1795739,
+        "distance_km": 0.73,
+        "rating": 4.5,
+        "review_count": 245,
+        "place_id": "ChIJAQfVQwCZlEcRL2RkatvUy3g",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Basic-Fit&destination_place_id=ChIJAQfVQwCZlEcRL2RkatvUy3g",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3nkTr2uz3HE9wwSUaWBmu7NygCTvMhETlCWRneTN9wU47V5WQxXYM8Tgdr4je6Mx3hzUFag4a3CkMYRhvhuxcINpDle7V7JtwvxVuQuBqi28fvSJn_3Bh1wxDcF9xWn16OYQFgT5DnGi-_1Z43B1kOQgWQNLeXLxlbyY6azg5fL_xFRutwxPdxKRS41b1JCrQQlunZsbFd7VIJap5J4A0RBrUOg0CVGbGG9KV4dvuMZxUZmmmz7sYL1MlCr4vxiBG0AYdQs0bg-aRijJXytBP67_NyIFGzqyjJdkBjhCQZMve0M8kyxUl2YOPbY7zSoERlq2L-Uqat115lFXimYXm4TOU3aCRwg_6iEbO3HOd6XNi4bvFHcggKDHEfLWJI-fYnWo0TSiQO4z4FTgBnej3QN8dYEqewCtK1M65ABpVhyUYk&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Fitness Park",
+        "type": "gym",
+        "lat": 48.686102,
+        "lon": 6.1948539,
+        "distance_km": 1.19,
+        "rating": 4.2,
+        "review_count": 840,
+        "place_id": "ChIJy_5boUOYlEcROln3LwPrHAw",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Fitness%20Park&destination_place_id=ChIJy_5boUOYlEcROln3LwPrHAw",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3nCgVC6pNwC3-vMjzERw_WIuIa36QvIiidb9mMJcSL7hiERDlic0c4wKAZ81o4heHD1bjTBw03MJNk-FiT1-lhRYLXloDgi-qZFWcT33kfExLjpUEZcBlKw8y7L8cdp005aYfA-fklT5rT3_zZIsfUc5soIJ5G92I5bdYMIFpV9RUbZTmgT-okm2pcgTAEV50vhJxSQ0jz495D58WVCbcI5nIfJlj0jALTybJM0iLiDTOUkjsQ_8K6hzGz4Q62f4pv9UPAE8drTlD2tUi-8C2QlyNPg5IYYcPlYKZbhT-GJRHXkAPH2RMeF9ihCgGa43DdL0HPHEac1X5WYKTdRwKYXte4tQRGfQb686SOwnhibf1UCwg5nWxOJ1g4cU0syptVbz3bq1NHRPXQcxnttzU_oE5ZPJncVvR4fBwJQb4pnjYWm&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Keepcool Nancy Centre Commanderie",
+        "type": "gym",
+        "lat": 48.6863675,
+        "lon": 6.170666799999999,
+        "distance_km": 1.24,
+        "rating": 4.6,
+        "review_count": 350,
+        "place_id": "ChIJo99nDneYlEcRxfP1UI9o7o0",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Keepcool%20Nancy%20Centre%20Commanderie&destination_place_id=ChIJo99nDneYlEcRxfP1UI9o7o0",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3m48lkyZWo9K59NSuD6gu1yBYrObmirS4Kz2g1b7mHPWHt3aJ7moY-OT4J4d2o0buz91iIY_wc-5qeqZoI6Q-Sx8ldWLs4t62g9UmR7eJ1zY8ZjmHKSfhQyhyCFPJvNyNmdj29--ofgnXx5_J3DNhxVnQyLiiKQ7uYD-rdx2zE9xTYAej06S_r6gOX3LI9wiEB5JOmtTxnnqFO1YKh7MSaWQ7P5KM_UagNtE6Ngt2Nsp302LkTkx687DmFAHG7Guw540w_ahC-tsimwNTTrVBpqf5BZdhUzp_lC9d7ehO6TSOMZ2-1kPGNLnmjY8TgdNektniRnn-wUOKQDDs_8zdPYQXRa_wiMqvH5uxNpdfknWzTq3gT-_7W56SSs23fgZJ-xkxHps-qhRAaXRcVc3SFUjq6BZXz5l1CxYR67HwwVIpVQ&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Punch",
+        "type": "gym",
+        "lat": 48.6827291,
+        "lon": 6.1808711,
+        "distance_km": 1.24,
+        "rating": 4.3,
+        "review_count": 107,
+        "place_id": "ChIJZ06DmGWYlEcRl9jq99_fRKQ",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Punch&destination_place_id=ChIJZ06DmGWYlEcRl9jq99_fRKQ",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3lmdWiwPX8Sgs0UkeOp2JK5wcG385tdWQuVYdZIe1DKrxZPilsd-X_i3NsUsMZkEdmX_9lEDGUWH8j3tcaNeNB3lgOZoIxh9pzBFTM-J6R8rbNLINEuvq4BsKOz20gOUKkn8sMM9PZy1m_HixtRs2gR9oeQM0CTwZ36aFdwydlWJyQ3DNMDkttmdMyl-Mv5ugLUrALP1rsL9DUvV8jVQ50dFAJe8WLaDamOVJCZHXX2Ppd9GSCxwZz8R_TFBZKx6kIplnPNUQMMGUEQk16391hep9tUnCvD8IAm2up55ewMfW4MpzkBOp3Qy5NqvQEZiBHyEyCSwzjV1WgkCoyF17r0UcVFa4uMj0DlmgO8ZfQsHqZXlzbXkZzshWYezaeiQFjpTdnEq6kw3NRGqqtNFXScRiCF-P5ZWXmTF46XVT-DluV6&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Curves Nancy Est - Gym for Women",
+        "type": "gym",
+        "lat": 48.6980884,
+        "lon": 6.2003729,
+        "distance_km": 1.34,
+        "rating": 4.8,
+        "review_count": 320,
+        "place_id": "ChIJz9dDWDmYlEcRK5lioRZEZSY",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Curves%20Nancy%20Est%20-%20Gym%20for%20Women&destination_place_id=ChIJz9dDWDmYlEcRK5lioRZEZSY",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3kjTSSFyQExwwa1TpQXzlFTahMnHDx0TaF4JxXCVmfO_QJBNTns_i737xvhWg_IZZG5AT8Zh1UEXoryMosTNUuUK_WGH6V-AbonBrtftutDU1w5JUBfzMUPOpvC8esJWy5auonj_yFZptwnwAa0LcKcUurbo-AOgoQVK3iO8gah09nd-aDPL-jMXEAK6JRW3CREC3GSyeAmtREJ1U1tc27tsOoiXRcW6qXwF_p5ytgyWdiYRo9fk_YcbTZ1ZHxz3kjMHP_RQOuRFpDxWhVDhQRTALBQtXGMXGWyU9bIahfT216uirhxSxkwtet6oU8YTklxuBoqFW1h8e7kj9SvK40lx0CcCaupAmoYOL3_XhFqHUlpJZewX04YmWBLHN2Uhmmxpa4xLkU_IVwC2jnpsR5RWpTmvvAxcAtXnMw_6_9VrDZo&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "BASIC-FIT",
+        "type": "gym",
+        "lat": 48.691361,
+        "lon": 6.201876,
+        "distance_km": 1.38,
+        "rating": 4,
+        "review_count": 574,
+        "place_id": "ChIJu7hqpUeYlEcRanhCSWQZcjA",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=BASIC-FIT&destination_place_id=ChIJu7hqpUeYlEcRanhCSWQZcjA",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3nlsY7FX3aOnshnWUF-HUtuGwFpo1CjQZ-Kp8zxhoSGEUpySIl0giE1zOsBLjyW3ifSm_f_MgOGAFrVqbR0trF5D7cuhXuenYDleBQTkwOcK7yyH1LpBW99TOBKOezcR8zHWKhj26EhyhPsdrnYefh_ZIG0aYylq2ILOhnbJMCAqGwfdugP9c9m28At0PHy17J05ZEp4KtkN__gVXzckUSf1SbYDN2U9bZbJrCy_b-cPT_NT133u3_tgqpCfq5kfQ_siw5UdsdoGxxcgdCh8RHfX5JqkjNmUd5ooFiWS2a0rw9Sm9DLa9xRwyx0yHFl_zf72hzAqH69iiK6QaLZTjqnz1kuHaud3JsGCWWwjtrIvhBxuzLDMgXAH06xdccjUzOiFf6cSAKtYcdWs3wAncotq91gruxFI8xQz_z-BXNCQKkI3ytSyBjdxfhrNxgU&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      }
+    ]
+  },
+  "venues_doğa yürüyüşü|nancy|2026-06-21": {
+    "date": "2026-06-21",
+    "data": []
+  },
+  "venues_park|nancy|2026-06-21": {
+    "date": "2026-06-21",
+    "data": [
+      {
+        "name": "Alliance Square",
+        "type": "park",
+        "lat": 48.6938754,
+        "lon": 6.1857643,
+        "distance_km": 0.17,
+        "rating": 4.4,
+        "review_count": 305,
+        "place_id": "ChIJ_Tn4q2yYlEcR6qCudmkNfbY",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Alliance%20Square&destination_place_id=ChIJ_Tn4q2yYlEcR6qCudmkNfbY",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3l7TRGOeSZuqfKdP0VkjYHK7x45Cuvwo0M1XmzkF3osg9G3nVvuksEK92OltUWMJPU8QLuS7YuliO1L3gYGuYOt53l9wU4EujTlb1goNST0TFvLMP-uutwW7uNd7Ic9MkKKDe84kh6S1OiiN4B5zkeJARXUkfHd9DaNtd5zezBStZqRs9ZcRYBe4oAJGSgGJX99YuK0XsPBLUcKJtzo4PDzNxeIXElaqC7fWltkkTud-HlrWINUiWRUa0_bp0en0GvF-SedNNaw_bUtgx3vFxYf52SrO7yIRsKJQOaO2NsGdjg83fYVPIrQzJ6uY9XsX3tmPDVhPQPLgx2PHtzQ7m_r9Hcs1kL3sgsKPo95VVDZEqea9tDHY5h_xQm6omLPyEdR8XaGxj2q45A4-EFJCKwtMrHzzCGlT2yZDkL8rc0Qvgca&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Parc de la Pépinière",
+        "type": "park",
+        "lat": 48.6977863,
+        "lon": 6.1846103,
+        "distance_km": 0.46,
+        "rating": 4.5,
+        "review_count": 12261,
+        "place_id": "ChIJ71rtyhOYlEcRk5zkSUe26IQ",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Parc%20de%20la%20P%C3%A9pini%C3%A8re&destination_place_id=ChIJ71rtyhOYlEcRk5zkSUe26IQ",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3kx2ASC-QgeHp7zDr_IpARV_8I9b8iUud4nkQXzmz3Sx7uJx_Fwu4-Qpm_4L9Zn2l7q6pXL7fhvoL7TjJB2SoCnn0Q1Vh4WwNL2geAreGSS82_5mGpt0hDmzFg2iMyNexyAHBYNbZ1EaRN8a4Xoe6S1ppl35bnOoj5nnS0W-Fn5Rlj5VZhMC19i7juwEwnpHhfWp8NhPr4upfb_Q7-gPeuDzrr_BWiFQaSEecL4clFu0F5bKm90exMcpJizQwjlVEiXuqsiW5MQSEeXyg2ZDFTKglnK1AkIX_EVO8r5gJ-II3tGeSdYV8xeYjg3ymaygqZUSFMiKDOhrguZyVgLCiDGz7kvFXaytp5YwGxLBQZ8eyuQmk1Xaf_jthkDWZ1fUKSNCv8KbsaYHHc33j09i76i0YVkWSEuNk393dmbyLXOVg&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Rivire parc",
+        "type": "park",
+        "lat": 48.6932134,
+        "lon": 6.1927194,
+        "distance_km": 0.69,
+        "rating": null,
+        "review_count": null,
+        "place_id": "ChIJQ4PERQCZlEcRJVGasx-7MaQ",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Rivire%20parc&destination_place_id=ChIJQ4PERQCZlEcRJVGasx-7MaQ",
+        "open_now": true,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3mpAdD0bzz2UrT7YodHkJ92uN2WFDVTKdb6fvVhpS9rvVr5WwFVV6Eq1hk5KeqHCnh0Ne9YzA7h65YRea-F05l_fMXaXZ8NmOsxWVYayW0Df4L7jDWopXgid3J847nkXDkqLzfstRTaujiX2Dc0YYAgSuhpSVDCYANZIxuoKVwlbPref9dYle0Hvm0SEg1-0-TUsgXQDKizN8PqZZ99lNNJU8iyCIZnWw2BQMkrEcbP0SFPz-hWraSSLIQ6Qh7DkxgW3zsHRi6Nuf0D4MqKPLBg1Doox-W13xkAU1LQKTok7HoKV-90PoQLnO7MPqJY3jj8eWSh85mB6Q-4zrPdBBfod69Jm2ylOCsyEJl1DGjh7v4PcqqJe0tVojbtkcsFH6Wf913xlBjiQWpAuH5kkDPW2a3-csPc1lFVFN7rkQ-cu0SDCu8W5yXcacKWjouk&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Parc Charles III",
+        "type": "park",
+        "lat": 48.689357,
+        "lon": 6.1902573,
+        "distance_km": 0.7,
+        "rating": 4,
+        "review_count": 594,
+        "place_id": "ChIJ0d5YPmqYlEcR67wTVJFErLs",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Parc%20Charles%20III&destination_place_id=ChIJ0d5YPmqYlEcR67wTVJFErLs",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3n11GryyHsEWGFAJ7gl9c3KYF-DcamdREl_U8HjpXwBrYKFBwsklqKR9I9GwgAVtiiEiLGrck6UL9mv4HxEurMC5RsfrvNx9-7SpqeKpr1EO86V95p6-yjEB2F6HsnFSnC-OSNo9SZ8Hr4Wo0vXOOAyFjj4OAbjIB-q73lvSlUCB0P4D8RvKIHPT7ZUgBK7wcYfxilC8yzlod5Z2A_rb8qFVZXStpQKZ6m5_6eAlkB-UqiJ6zfnzdzjJJUNIa2ppqkSkHEUcyJQvqPguYcXJAeTtfNqxfNpEj9xXL0FostKQBNpBmVfKW8FwymhI1Xzn2s_s8OaYxQalAkKAMlQM8d6Dg3Qi-M8vCFafnJ9JXa4eEc3-dKampc28XUg-sLLaFA5GZhrOj2SU0YUPclX2mmstpzJO4gviN-pfLd_3y_f8s8W&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Parc Blondlot",
+        "type": "park",
+        "lat": 48.6920091,
+        "lon": 6.1736684,
+        "distance_km": 0.74,
+        "rating": 4.3,
+        "review_count": 401,
+        "place_id": "ChIJ24-VfHSYlEcRGTU9bS1-4oc",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Parc%20Blondlot&destination_place_id=ChIJ24-VfHSYlEcRGTU9bS1-4oc",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3mLZljK_LydlDQZ3vXcJCRW3AaDaVRCG6HVX80hT_RE3yR5DmnMJMHrSflKbqcLfMy6b8bnSd0ZFLmBibZbmO2ioQyD-TTbkHtF-2ARopRuFzw2CQnMjYBTTFCJb28lyVSfoM-FkuVVXpIbfQp0e_rs69db4cAHKzSHv-XJZfvEjOtYPMO2POvOYiDPC3urTNvaYJDY0VUAdEj71z8JW2HcYCXEmXPuLQwdtZuA7Q_osbU_91cQULCQJMeRPl4v0oCEEOXt3MtfJYa9mf_QD0AwhSc2_jJMj9G0rIGtEwlZIwPd38r9puWj_NmVIc-AYy48nwO9Bd17pKs8wIBUK8FuHb_LRaYlXlaARCxiNw4V_ixbfIj1CqsiQ2nP6o8O6i1ksc3U9FEbXQCL0PRTBP7rcHxgd5Ech4LSogf2vXMIzRYz&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Olry Park, Nancy",
+        "type": "park",
+        "lat": 48.6821648,
+        "lon": 6.193387299999999,
+        "distance_km": 1.48,
+        "rating": 4.3,
+        "review_count": 779,
+        "place_id": "ChIJEyqm31yYlEcRdQlGWaB7XGA",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Olry%20Park%2C%20Nancy&destination_place_id=ChIJEyqm31yYlEcRdQlGWaB7XGA",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3msLKAIITsiEy7TEl02_4nRpB9Sr33yririqWxY68YkT1QkQPD3Asd9CufJtdUftGyIsH5MWUYPL7Ra-A15_h0FRyCA7efVkMMTvhhE8tWU2Q2A9cCdnPsBw1iGCsKnJt_IoNsBqSjXOh_NKGGqgtOqwHoQ4vcHPbR-ztJpJ0cxX7cJCYL9BN-9K8wI9pVSVETlGFiUzdW959X95KXrbK5KVEfKpY-DHXTWAMfdWYho1C8KsfB0fBtP6dFrJMp1bCS8FHbZjakgfh13yXlIROwuHI24tI48XqMzRZItK6w1JW4UpcXcaEhALm9hH_6u_LFmqszILoJEw0AKGwxJtA84dovGDmdcrAuvSKsEaTiKx5kNKbrAsVdOZpah0vd8Pa0dnz2HTuCiKXvbwtFGSBeuVtIO4L1K-8cZN2hhFlY&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Square Paul Verlaine",
+        "type": "park",
+        "lat": 48.6880376,
+        "lon": 6.1637124,
+        "distance_km": 1.58,
+        "rating": 4.4,
+        "review_count": 106,
+        "place_id": "ChIJLeh0q7ejlEcR0k0GfDKg_Mw",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Square%20Paul%20Verlaine&destination_place_id=ChIJLeh0q7ejlEcR0k0GfDKg_Mw",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3mlu-54gyp02XjVPjEJh7tW7Ln_ixpC16JvojZeDD2jE9Z07TZ20oUjG2tSCv53acE8bH0cZbH2qH08xMEyF9Vq336X-_3a5PsauipjBwFifc1vMvG9IM82mzOMduYuI_1qU6S-E1akv2TJVkVl11jajkD1dB8B4ZTDssSfFOznMVAUoYJgud8nAaakJdhlFfNzw7Le_Ya6BXZbZHxTkAUIwzmfzqpxev5f5QbKkBAYDJys_oIVbIqWNvgL68TufQQlaq_UY0Fb9DikDe_TxMQeZm87OH42p_Ap4WkQQGPQG1hEysnBu8KvhwE1LTdh2u1l15uS-y3SQr-dtsDFYhuUhK9DqOI-t6Qjwq5Zw7maguKCoaPZq91nxwQPyVVswymm-gdmagXvd2-eUZNrkrXhCZF897ManTny97YF9LWWvq8a&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      },
+      {
+        "name": "Parc de la Cure d'Air",
+        "type": "park",
+        "lat": 48.693427,
+        "lon": 6.1598523,
+        "distance_km": 1.73,
+        "rating": 4.6,
+        "review_count": 1008,
+        "place_id": "ChIJIRfUy5milEcRwTCNW4pNUuE",
+        "maps_url": "https://www.google.com/maps/dir/?api=1&destination=Parc%20de%20la%20Cure%20d%27Air&destination_place_id=ChIJIRfUy5milEcRwTCNW4pNUuE",
+        "open_now": false,
+        "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3n_uvVvzaSg_4Q-CyhzWv5NijtNjf9A4o744JhJkT76lDlHK84v-2o60ru9yfUe6Q22VKtizZBzg2gtNDkudKn1-OPM9TiClH-5bN2Adzro87zfDs2xtjcZOiaewyd3Bk_eYaPhxvIQakOQ7qbuXho_M0Ya93lQF7QFwqSqM3vhG5B2hAlawvso-1YIJyOcC7uS-WW_WyvX6cVSvLh7bahZOVXr221hHIHGMbt0lNVDrlzHe0zdkj5LXnANJLMpsUcgFv07jmxv1yjkRI-D_JUgc9392s0jjWiSOclNjnEU3A_RRyPbS6XYpZsEBjcrSM2udJbC3Gz2JRR8ukmlyje_b8VLIRU4OFyyG6LS5OuhZUF3zOkEkoFWIpmdaotBVDyK_o6fxfVhhf-DVAAzUffTFZRxhs6ftmqfve2fSbrk45Mo&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
+      }
+    ]
   }
 }
