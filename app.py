@@ -23,7 +23,7 @@ import os  # noqa: E402
 
 import gradio as gr  # noqa: E402
 
-from chat import chat_skywise, clear_last_location, get_last_locations  # noqa: E402
+from chat import chat_skywise, clear_last_location, get_last_locations, generate_next_suggestion  # noqa: E402
 from ui_theme import (  # noqa: E402
     CUSTOM_CSS,
     render_locations_map,
@@ -89,15 +89,27 @@ FORCE_DARK_JS = """
     if (app) app.setAttribute('theme', 'dark');
     document.documentElement.classList.add('dark');
     if (!document.body.dataset.theme) document.body.dataset.theme = 'clear-day';
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== 'Tab') return;
+        var sugBox = document.querySelector('#skywise-suggestion textarea, #skywise-suggestion input');
+        if (!sugBox || !sugBox.value) return;
+        var chatInput = document.querySelector('.chat-input-row textarea');
+        if (!chatInput) return;
+        e.preventDefault();
+        chatInput.value = sugBox.value;
+        chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+        chatInput.focus();
+    });
 }
 """
 
 
 def respond(user_message: str, history: list[dict]):
-    """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state)."""
+    """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box)."""
     user_message = (user_message or "").strip()
     if not user_message:
-        yield gr.update(), "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        yield gr.update(), "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         return
 
     history = list(history or [])
@@ -106,7 +118,7 @@ def respond(user_message: str, history: list[dict]):
 
     # Kullanıcı mesajı anında görünsün; boş durum kartları kaybolsun
     # Harita sıfırlanmaz — sadece yeni venue geldiğinde güncellenir
-    yield gr.update(value=history, visible=True), "", gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(visible=False), []
+    yield gr.update(value=history, visible=True), "", gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(visible=False), [], gr.update()
 
     convo_for_agent = history[:-1]
     clear_last_weather()
@@ -124,13 +136,13 @@ def respond(user_message: str, history: list[dict]):
 
             if weather is not None and not panel_sent:
                 panel_sent = True
-                yield history, "", gr.update(), render_weather_panel(weather), weather_to_theme(weather), gr.update(), gr.update(), gr.update()
+                yield history, "", gr.update(), render_weather_panel(weather), weather_to_theme(weather), gr.update(), gr.update(), gr.update(), gr.update()
             elif venues and not map_sent:
                 map_sent = True
                 map_html = render_map_panel(venues)
-                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=bool(map_html)), gr.update(visible=False), gr.update()
+                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=bool(map_html)), gr.update(visible=False), gr.update(), gr.update()
             else:
-                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
         # Son iterasyonda harita henüz gönderilmediyse gönder
         if not map_sent:
@@ -138,7 +150,7 @@ def respond(user_message: str, history: list[dict]):
             if venues:
                 map_html = render_map_panel(venues)
                 if map_html:
-                    yield history, "", gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), gr.update()
+                    yield history, "", gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), gr.update(), gr.update()
                     map_sent = True
 
         # Harita gösterilmediyse lokasyon etiketleri kontrol et
@@ -149,14 +161,24 @@ def respond(user_message: str, history: list[dict]):
                     btn_label = f"📍 {locs[0]} konumunu haritada göster"
                 else:
                     btn_label = f"📍 Bunları haritada göster ({len(locs)} yer)"
-                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), locs
+                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), locs, gr.update()
+
+        # Streaming bitti — bağlama göre öneri üret ve placeholder'ı güncelle
+        hint, suggestion = generate_next_suggestion(history)
+        default_placeholder = "Mesajını yaz... (örn: \"Bugün İstanbul'da ne yapsam?\")"
+        yield (
+            gr.update(),
+            gr.update(value="", placeholder=hint if hint else default_placeholder),
+            gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
+            suggestion,
+        )
 
     except ValueError as e:
         history[-1]["content"] = f"> ⚠️ {e}"
-        yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
     except Exception as e:
         history[-1]["content"] = f"> ⚠️ Bir hata oluştu: {e}"
-        yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
 
 def clear_chat():
@@ -281,8 +303,9 @@ with gr.Blocks(
 
     theme_state = gr.Textbox(visible=False, elem_id="theme-state")
     geo_coords = gr.Textbox(visible=False, elem_id="geo-coords")
+    suggestion_box = gr.Textbox(visible=False, elem_id="skywise-suggestion", interactive=False)
 
-    OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state]
+    OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box]
 
     textbox.submit(respond, [textbox, chatbot], OUTPUTS, api_name=False)
     send_btn.click(respond, [textbox, chatbot], OUTPUTS, api_name=False)

@@ -526,3 +526,48 @@ def chat_skywise(messages: list[dict]) -> Iterator[str]:
                 pass
 
     yield from _stream_chunks(final_text)
+
+
+def generate_next_suggestion(history: list[dict]) -> tuple[str, str]:
+    """Konuşma bağlamına göre (placeholder_hint, full_suggestion) döndürür.
+
+    Hata durumunda ("", "") döner; uygulama etkilenmez.
+    """
+    try:
+        lang = _current_language
+        recent = [m for m in history if not m.get("content", "").startswith('<div class="typing')]
+        tail = recent[-4:] if len(recent) >= 4 else recent
+        if not tail:
+            return "", ""
+
+        convo_lines = []
+        for m in tail:
+            role = "Kullanıcı" if m["role"] == "user" else "Asistan"
+            text = (m.get("content") or "")[:300]
+            convo_lines.append(f"{role}: {text}")
+        convo_text = "\n".join(convo_lines)
+
+        if lang == "tr":
+            sys_msg = (
+                "Aşağıdaki konuşmaya bakarak kullanıcının sormak isteyeceği "
+                "TAM OLARAK BİR follow-up soru üret. "
+                "Sadece soruyu yaz, başka hiçbir şey ekleme. Maksimum 80 karakter. Türkçe yaz."
+            )
+        else:
+            sys_msg = (
+                "Given the conversation below, generate EXACTLY ONE follow-up question "
+                "the user would likely ask next. "
+                "Output only the question, nothing else. Maximum 80 characters. Write in English."
+            )
+
+        response = react_llm.invoke(
+            [SystemMessage(content=sys_msg), HumanMessage(content=convo_text)],
+            config={"max_tokens": 80},
+        )
+        suggestion = (response.content or "").strip().strip('"').strip("'")
+        if not suggestion:
+            return "", ""
+        hint = suggestion[:55] + (" ↹" if len(suggestion) <= 55 else "… ↹")
+        return hint, suggestion
+    except Exception:
+        return "", ""

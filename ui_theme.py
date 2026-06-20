@@ -745,8 +745,9 @@ textarea, input[type="text"] {
     font-size: 15.5px !important;
 }
 textarea::placeholder, input::placeholder {
-    color: var(--ink-faint) !important;
-    font-weight: 500 !important;
+    color: rgba(180, 190, 220, 0.6) !important;
+    font-weight: 400 !important;
+    font-style: italic !important;
 }
 textarea:focus, input:focus {
     border-color: var(--accent) !important;
