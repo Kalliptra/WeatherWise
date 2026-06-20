@@ -103,12 +103,31 @@ FORCE_DARK_JS = """
     });
 
     function scrollChatToBottom() {
-        var el = document.querySelector('.chat-area .bubble-wrap, .chat-area > div, .chat-area');
-        if (el) el.scrollTop = el.scrollHeight;
+        // Son mesajı bul ve görünür yap
+        var messages = document.querySelectorAll('.chat-area .message-wrap, .chat-area [class*="message"], .chat-area .bubble-wrap > div');
+        if (messages.length > 0) {
+            messages[messages.length - 1].scrollIntoView({ block: 'end', behavior: 'smooth' });
+        }
+        // Ek güvence: scroll yapabilecek tüm üst container'ları da kayan yap
+        var selectors = [
+            '.chat-area .bubble-wrap',
+            '.chat-area .wrap',
+            '.chat-area > div:first-child',
+            '.chat-area',
+        ];
+        for (var i = 0; i < selectors.length; i++) {
+            var el = document.querySelector(selectors[i]);
+            if (el && el.scrollHeight > el.clientHeight) {
+                el.scrollTop = el.scrollHeight;
+                break;
+            }
+        }
     }
 
+    var _scrollTimer = null;
     var chatObserver = new MutationObserver(function() {
-        scrollChatToBottom();
+        if (_scrollTimer) clearTimeout(_scrollTimer);
+        _scrollTimer = setTimeout(scrollChatToBottom, 50);
     });
 
     function attachChatObserver() {
