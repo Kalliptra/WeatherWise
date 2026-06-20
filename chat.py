@@ -20,6 +20,7 @@ from tools.weather import (
     calculate_comfort_index,
     format_weather_summary,
     get_forecast,
+    get_last_weather,
     get_weather,
 )
 
@@ -136,9 +137,14 @@ def _classify_intent(
 
 
 def _extract_city_from_message(text: str) -> Optional[str]:
-    """Mesajdan büyük harfle başlayan şehir adayı çıkar (heuristic)."""
+    """Mesajdan büyük harfle başlayan şehir adayı çıkar (heuristic).
+
+    Türkçe ekleri (Londra'daki, İzmir'de) ayıklar → temiz şehir adı döner.
+    """
     for word in text.split():
         clean = word.strip("?.,!:;").strip()
+        # Kesme işaretinden sonrasını (ek) at: "Londra'daki" → "Londra"
+        clean = re.split(r"['’]", clean)[0]
         if clean and len(clean) > 1 and clean[0].isupper() and clean.lower() not in _COMMON_STOPWORDS:
             return clean
     return None
@@ -309,6 +315,31 @@ def _turn_produced_recommendation(new_messages: list) -> bool:
     return False
 
 
+_CITY_TOOLS = frozenset(
+    {"venue_search_tool", "current_weather_tool", "forecast_tool", "uv_tool"}
+)
+
+
+def _focus_city_from_tools(new_messages: list) -> Optional[str]:
+    """Bu turda çağrılan araçların 'city' argümanından ele alınan şehri döner.
+
+    Kullanıcının sorduğu ya da asistanın önerdiği yer buradan gelir; sol
+    panelin hangi şehre güncelleneceğini belirlemek için en güvenilir sinyal.
+    """
+    city: Optional[str] = None
+    for m in new_messages:
+        if not isinstance(m, AIMessage):
+            continue
+        for call in getattr(m, "tool_calls", None) or []:
+            name = call.get("name") if isinstance(call, dict) else getattr(call, "name", "")
+            if name in _CITY_TOOLS:
+                args = call.get("args") if isinstance(call, dict) else getattr(call, "args", {})
+                value = (args or {}).get("city")
+                if value and value.strip():
+                    city = value.strip()  # son çağrılan şehir geçerli olsun
+    return city
+
+
 def _last_user_text(messages: list[dict]) -> str:
     for m in reversed(messages):
         if m.get("role") == "user":
@@ -476,5 +507,22 @@ def chat_skywise(messages: list[dict]) -> Iterator[str]:
     global _last_locations
     _last_locations = [m.strip() for m in _LOC_TAG_RE.findall(final_text)]
     final_text = _LOC_TAG_RE.sub("", final_text).strip()
+
+    # Sol panel güvencesi: bu turda hava durumu zaten çekildiyse (current_weather_tool)
+    # panel doğru şehirde. Çekilmediyse, ele alınan şehri belirle ve havasını çek:
+    #   1) bu turda araca verilen şehir (sorulan/önerilen yer)
+    #   2) mesajda açıkça geçen şehir
+    #   3) hiçbiri yoksa kullanıcının kendi konumu (yer belirtmediyse)
+    if get_last_weather() is None:
+        focus_city = (
+            _focus_city_from_tools(new_messages)
+            or _extract_city_from_message(last_user)
+            or _user_location
+        )
+        if focus_city:
+            try:
+                get_weather(focus_city, lang=_current_language)
+            except (ValueError, ConnectionError):
+                pass
 
     yield from _stream_chunks(final_text)

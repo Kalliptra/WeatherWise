@@ -1365,5 +1365,29 @@
         "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3l54nBmQXh04gP9r0OfTGy9N9fqa-MrVwD6MmG3_SsGi6x0kCNKQubA-6x7glzAAuQnx-DOQzPSS1HACN0qQvyPWlC9Ibz1REbJLE2qoRmLFyi5WWVuZN2bNH3TknvapeTYNqRK0OgkuS98DvmGkMvWJCsoJ52ZddHnAvtcsdJK4ftPNDtf1IstHupBOW07kKst2oyTguH6QHTZ6KbzOt68anhgwFC3xt6iR2coyTc7xfV3jKMfzVv4L24WV4my5X6AmzSL8QKLTTRWPyn5TH7H6l9t4l2Aj0g4eBZUoV9XNXef5Ma1yaWCBM1NB8KXwdpM2vLyLCajkloKr9riRXoouJMPiatFlH6eRSnXh-ZOv3qHbmhpcHRBjqXnVdJSY0y6yVFRTLqPnvuT_oZyaazFjpmNIqH_vgU9kYxFAYkpHPOVbsc4oZHD5eaL5VH2&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       }
     ]
+  },
+  "weather|london|2026-06-21": {
+    "date": "2026-06-21",
+    "data": {
+      "city": "London",
+      "country": "GB",
+      "temperature": 20.7,
+      "feels_like": 20.9,
+      "humidity": 79,
+      "wind_speed": 1.6,
+      "condition": "scattered clouds",
+      "condition_id": 802,
+      "visibility": 10,
+      "icon": "03n",
+      "is_night": true,
+      "sunset_unix": 1781986869,
+      "sunset_str": "23:21",
+      "minutes_to_sunset": 0,
+      "is_rainy": false,
+      "is_stormy": false,
+      "is_snowy": false,
+      "is_foggy": false,
+      "is_clear": true
+    }
   }
 }
