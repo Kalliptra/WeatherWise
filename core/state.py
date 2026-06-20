@@ -33,6 +33,7 @@ class SkyWiseState(TypedDict, total=False):
     plan: list[PlannedCall]
     plan_done: bool
     recommendation: str
+    itinerary: Optional[str]
     evaluation: Evaluation
     iteration: int
     history: Annotated[list[str], add]

@@ -23,10 +23,10 @@ import os  # noqa: E402
 
 import gradio as gr  # noqa: E402
 
-from chat import chat_skywise, clear_last_location, get_last_location  # noqa: E402
+from chat import chat_skywise, clear_last_location, get_last_locations  # noqa: E402
 from ui_theme import (  # noqa: E402
     CUSTOM_CSS,
-    render_location_map,
+    render_locations_map,
     render_map_panel,
     render_panel_placeholder,
     render_weather_panel,
@@ -51,10 +51,10 @@ ORNEK_SORULAR = [
 
 KARSILAMA_HTML = """
 <div class="greeting">
-    <div class="wave">👋</div>
+    <div class="wave">🌙</div>
     <h2>Merhaba! Ben SkyWise</h2>
-    <p>Hava durumuna göre aktivite öneren asistanın. Hangi şehirde olduğunu
-    ve nasıl bir aktivite aradığını söyle, sana özel öneriler hazırlayayım.</p>
+    <p>Hava durumuna göre aktivite öneren asistanın. Bir şehir ve nasıl bir
+    aktivite aradığını yaz; senin için anlık öneriler ve harita hazırlayayım.</p>
 </div>
 """
 
@@ -76,6 +76,17 @@ async () => {
 
 THEME_JS = "(t) => { document.body.dataset.theme = t || 'clear-day'; }"
 
+# Gradio'nun kendi koyu modunu zorla (dahili bileşenler de koyuya uysun) +
+# tema set edilene kadar varsayılan accent görünsün
+FORCE_DARK_JS = """
+() => {
+    const app = document.querySelector('gradio-app');
+    if (app) app.setAttribute('theme', 'dark');
+    document.documentElement.classList.add('dark');
+    if (!document.body.dataset.theme) document.body.dataset.theme = 'clear-day';
+}
+"""
+
 
 def respond(user_message: str, history: list[dict]):
     """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state)."""
@@ -89,7 +100,8 @@ def respond(user_message: str, history: list[dict]):
     history.append({"role": "assistant", "content": ""})
 
     # Kullanıcı mesajı anında görünsün; boş durum kartları kaybolsun
-    yield gr.update(value=history, visible=True), "", gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(visible=False), ""
+    # Harita sıfırlanmaz — sadece yeni venue geldiğinde güncellenir
+    yield gr.update(value=history, visible=True), "", gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(visible=False), []
 
     convo_for_agent = history[:-1]
     clear_last_weather()
@@ -123,12 +135,15 @@ def respond(user_message: str, history: list[dict]):
                     yield history, "", gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), gr.update()
                     map_sent = True
 
-        # Harita gösterilmediyse lokasyon etiketi kontrol et
+        # Harita gösterilmediyse lokasyon etiketleri kontrol et
         if not map_sent:
-            loc = get_last_location()
-            if loc:
-                btn_label = f"📍 {loc} konumunu haritada göster"
-                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), loc
+            locs = get_last_locations()
+            if locs:
+                if len(locs) == 1:
+                    btn_label = f"📍 {locs[0]} konumunu haritada göster"
+                else:
+                    btn_label = f"📍 Bunları haritada göster ({len(locs)} yer)"
+                yield history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), locs
 
     except ValueError as e:
         history[-1]["content"] = f"> ⚠️ {e}"
@@ -151,16 +166,23 @@ def clear_chat():
     )
 
 
-def show_location_on_map(location_name: str):
-    """Lokasyon adını geocode edip tek pinli harita döndürür."""
-    if not location_name:
+def show_location_on_map(location_names):
+    """Lokasyon adlarını geocode edip haritada gösterir (tek veya çok)."""
+    if not location_names:
         return gr.update(), gr.update(visible=False)
-    try:
-        lat, lon = geocode_city(location_name)
-        map_html = render_location_map(location_name, lat, lon)
-        return gr.update(value=map_html, visible=True), gr.update(visible=False)
-    except Exception:
+    if isinstance(location_names, str):
+        location_names = [location_names]
+    coords = []
+    for name in location_names:
+        try:
+            lat, lon = geocode_city(name)
+            coords.append((name, lat, lon))
+        except Exception:
+            continue
+    if not coords:
         return gr.update(), gr.update(visible=False)
+    map_html = render_locations_map(coords)
+    return gr.update(value=map_html, visible=True), gr.update(visible=False)
 
 
 def load_default_city():
@@ -184,18 +206,18 @@ def apply_geolocation(coords: str):
 with gr.Blocks(
     title="SkyWise — Hava Durumu Aktivite Asistanı",
     theme=gr.themes.Base(
-        primary_hue="blue",
+        primary_hue="indigo",
         neutral_hue="slate",
         font=gr.themes.GoogleFont("Inter"),
     ),
     css=CUSTOM_CSS,
+    js=FORCE_DARK_JS,
 ) as demo:
     gr.HTML(
         """
-        <div class="hero">
-            <div class="eyebrow">Hava Durumu Aktivite Asistanı</div>
-            <h1>SkyWise</h1>
-            <p>Şehrini yaz, bugünün havasına en uygun aktiviteleri anında öner.</p>
+        <div class="topbar">
+            <div class="brand"><span class="brand-logo">◐</span> SkyWise</div>
+            <div class="brand-tag">Hava durumuna göre kişisel aktivite asistanın</div>
         </div>
         """,
     )
@@ -241,7 +263,7 @@ with gr.Blocks(
                 send_btn = gr.Button("Gönder ↗", variant="primary", scale=1)
 
             with gr.Row():
-                clear_btn = gr.Button("🗑 Sohbeti Temizle", size="sm")
+                clear_btn = gr.Button("🗑 Sohbeti Temizle", size="sm", elem_classes="clear-btn")
 
     gr.Markdown(
         """

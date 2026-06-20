@@ -1,7 +1,9 @@
-"""SkyWise UI teması: hava durumuna göre dinamik renk paletleri, SVG ikonlar ve panel HTML'i.
+"""SkyWise UI teması: koyu (dark) glassmorphism tasarım + SVG ikonlar + panel HTML'i.
 
-Tema, `document.body.dataset.theme` üzerinden seçilir; her tema yalnızca CSS
-değişkenlerini override eder, bileşen stilleri tek bir yerde tanımlıdır.
+Zemin her zaman koyu kalır; hava durumu yalnızca vurgu rengini (--accent),
+parlamayı (--glow) ve ikon tonlarını değiştirir. Tema, `document.body.dataset.theme`
+üzerinden seçilir ve her tema yalnızca accent ile ilgili CSS değişkenlerini
+override eder. Bileşen stilleri tek bir yerde (CUSTOM_CSS) tanımlıdır.
 """
 
 import html as _html
@@ -9,6 +11,28 @@ import json as _json
 import os as _os
 
 _GMAPS_KEY = _os.getenv("GOOGLE_PLACES_API_KEY", "")
+
+# Koyu zemine uygun Google Maps stil dizisi (API anahtarı olan kullanıcılar için)
+_GMAPS_DARK_STYLE = [
+    {"elementType": "geometry", "stylers": [{"color": "#1c2233"}]},
+    {"elementType": "labels.text.stroke", "stylers": [{"color": "#11151f"}]},
+    {"elementType": "labels.text.fill", "stylers": [{"color": "#9aa4c2"}]},
+    {"featureType": "administrative", "elementType": "geometry",
+     "stylers": [{"color": "#39415a"}]},
+    {"featureType": "poi", "elementType": "geometry", "stylers": [{"color": "#242b3d"}]},
+    {"featureType": "poi.park", "elementType": "geometry", "stylers": [{"color": "#1c3326"}]},
+    {"featureType": "poi.park", "elementType": "labels.text.fill",
+     "stylers": [{"color": "#6fae8a"}]},
+    {"featureType": "road", "elementType": "geometry", "stylers": [{"color": "#2a3146"}]},
+    {"featureType": "road", "elementType": "labels.text.fill",
+     "stylers": [{"color": "#aab4d0"}]},
+    {"featureType": "road.highway", "elementType": "geometry",
+     "stylers": [{"color": "#39415a"}]},
+    {"featureType": "transit", "stylers": [{"visibility": "off"}]},
+    {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#0e1422"}]},
+    {"featureType": "water", "elementType": "labels.text.fill",
+     "stylers": [{"color": "#4a5878"}]},
+]
 
 
 def weather_to_theme(weather: dict) -> str:
@@ -133,15 +157,12 @@ def render_weather_panel(weather: dict, uv=None) -> str:
     uv_level = (uv or {}).get("uv_level_tr") or (uv or {}).get("uv_level_en")
     uv_index = (uv or {}).get("uv_index")
 
-    meta_parts = []
+    chips = []
     if sunset_str:
-        meta_parts.append(f"🌅 {sunset_str}")
+        chips.append(f'<span class="wx-chip">🌅 {sunset_str}</span>')
     if uv_index is not None and uv_level:
-        meta_parts.append(f"☀ UV {uv_index} ({uv_level})")
-    meta_html = (
-        f'<div class="wx-meta">{"&nbsp;&nbsp;|&nbsp;&nbsp;".join(meta_parts)}</div>'
-        if meta_parts else ""
-    )
+        chips.append(f'<span class="wx-chip">☀ UV {uv_index} · {uv_level}</span>')
+    chips_html = f'<div class="wx-chips">{"".join(chips)}</div>' if chips else ""
 
     return (
         '<div class="wx-panel">'
@@ -150,7 +171,7 @@ def render_weather_panel(weather: dict, uv=None) -> str:
         f'<div class="wx-feels">Hissedilen {feels}°</div>'
         f'<div class="wx-cond">{condition}</div>'
         f'<div class="wx-city">{place}</div>'
-        f"{meta_html}"
+        f"{chips_html}"
         "</div>"
     )
 
@@ -164,22 +185,23 @@ def _fmt_review_count(n) -> str:
 
 
 def _map_iframe(center_lat: float, center_lon: float, venues_data: list[dict], zoom: int = 14) -> str:
-    """Haritayı iframe srcdoc olarak render eder.
+    """Haritayı iframe srcdoc olarak render eder (koyu temalı).
 
-    GOOGLE_PLACES_API_KEY varsa Google Maps JavaScript API kullanır,
-    yoksa CartoDB Voyager tile'ları (Google Maps benzeri stil) ile Leaflet kullanır.
+    GOOGLE_PLACES_API_KEY varsa koyu stilli Google Maps JavaScript API kullanır,
+    yoksa CartoDB dark_all tile'ları ile Leaflet kullanır.
     """
     venues_json = _json.dumps(venues_data)
 
     if _GMAPS_KEY:
+        styles_json = _json.dumps(_GMAPS_DARK_STYLE)
         map_doc = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
 <style>
-  html, body {{ margin: 0; padding: 0; height: 100%; }}
+  html, body {{ margin: 0; padding: 0; height: 100%; background: #0e1422; }}
   #map {{ width: 100%; height: 100vh; }}
-  .gm-popup {{ font-family: Arial, sans-serif; font-size: 13px; }}
+  .gm-popup {{ font-family: 'Inter', Arial, sans-serif; font-size: 13px; }}
   .gm-popup a {{ color: #1a73e8; font-weight: 600; text-decoration: none; }}
 </style>
 </head>
@@ -193,7 +215,8 @@ function initMap() {{
     zoom: {zoom},
     mapTypeControl: false,
     streetViewControl: false,
-    fullscreenControl: false
+    fullscreenControl: false,
+    styles: {styles_json}
   }});
   var infoWindow = new google.maps.InfoWindow();
   venues.forEach(function(v) {{
@@ -229,7 +252,7 @@ function initMap() {{
 <meta charset="utf-8"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-  html, body {{ margin: 0; padding: 0; height: 100%; }}
+  html, body {{ margin: 0; padding: 0; height: 100%; background: #0e1422; }}
   #map {{ width: 100%; height: 100vh; }}
   a {{ color: #1a73e8; font-weight: 600; }}
 </style>
@@ -239,7 +262,7 @@ function initMap() {{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 var map = L.map('map').setView([{center_lat}, {center_lon}], {zoom});
-L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
   attribution: '&copy; OpenStreetMap &copy; CARTO',
   subdomains: 'abcd',
   maxZoom: 19
@@ -259,11 +282,15 @@ venues.forEach(function(v) {{
 </html>"""
 
     srcdoc = _html.escape(map_doc, quote=True)
-    return f'<iframe srcdoc="{srcdoc}" style="width:100%;height:280px;border:none;border-radius:16px;" loading="lazy"></iframe>'
+    return (
+        f'<iframe srcdoc="{srcdoc}" '
+        'style="width:100%;height:280px;border:1px solid rgba(255,255,255,0.08);'
+        'border-radius:18px;" loading="lazy"></iframe>'
+    )
 
 
 def render_map_panel(venues: list[dict]) -> str:
-    """Venue kartları + Leaflet.js haritası (iframe ile)."""
+    """Venue kartları + koyu harita (iframe ile)."""
     if not venues:
         return ""
 
@@ -279,8 +306,7 @@ def render_map_panel(venues: list[dict]) -> str:
     for v in valid:
         rating_str = f"⭐ {v['rating']}" if v.get("rating") else ""
         reviews_str = _fmt_review_count(v.get("review_count"))
-        meta_parts = [p for p in [rating_str, reviews_str] if p]
-        meta_line = " · ".join(meta_parts)
+        meta_line = " · ".join([p for p in [rating_str, reviews_str] if p])
         dist_str = f"{v['distance_km']} km" if v.get("distance_km") is not None else ""
         maps_url = v.get("maps_url", "#")
         safe_name = _html.escape(v["name"])
@@ -288,34 +314,30 @@ def render_map_panel(venues: list[dict]) -> str:
         # Açık/Kapalı rozeti
         open_now = v.get("open_now")
         if open_now is True:
-            badge = '<span style="font-size:0.7rem;font-weight:700;color:#1a7a3c;background:#d4f7e1;border-radius:6px;padding:2px 7px;">Açık</span>'
+            badge = '<span class="venue-badge venue-badge--open">Açık</span>'
         elif open_now is False:
-            badge = '<span style="font-size:0.7rem;font-weight:700;color:#b91c1c;background:#fee2e2;border-radius:6px;padding:2px 7px;">Kapalı</span>'
+            badge = '<span class="venue-badge venue-badge--closed">Kapalı</span>'
         else:
             badge = ""
 
         # Fotoğraf
         photo_url = v.get("photo_url")
         photo_html = (
-            f'<img src="{photo_url}" alt="{safe_name}" '
-            f'style="width:100%;height:90px;object-fit:cover;border-radius:8px;margin-bottom:4px;" '
+            f'<img class="venue-card__photo" src="{photo_url}" alt="{safe_name}" '
             f'loading="lazy" onerror="this.style.display=\'none\'">'
         ) if photo_url else ""
 
-        cards_html += f"""
-<div style="display:flex;flex-direction:column;min-width:160px;max-width:200px;
-background:rgba(255,255,255,0.13);border-radius:12px;padding:10px 12px;gap:4px;
-flex-shrink:0;border:1px solid rgba(255,255,255,0.18);overflow:hidden;">
-  {photo_html}
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;">
-    <div style="font-weight:600;font-size:0.82rem;line-height:1.3;color:var(--ink,#1a1a2e);">{safe_name}</div>
-    {badge}
-  </div>
-  <div style="font-size:0.76rem;color:var(--ink-soft,#555);">{meta_line}</div>
-  <div style="font-size:0.73rem;color:var(--ink-faint,#888);">{dist_str}</div>
-  <a href="{maps_url}" target="_blank"
-     style="margin-top:2px;font-size:0.76rem;font-weight:600;color:#4fa3c7;text-decoration:none;">🗺 Rota Al</a>
-</div>"""
+        meta_html = f'<div class="venue-card__meta">{meta_line}</div>' if meta_line else ""
+        dist_html = f'<div class="venue-card__dist">{dist_str}</div>' if dist_str else ""
+
+        cards_html += (
+            '<div class="venue-card">'
+            f"{photo_html}"
+            f'<div class="venue-card__head"><div class="venue-card__name">{safe_name}</div>{badge}</div>'
+            f"{meta_html}{dist_html}"
+            f'<a class="venue-card__route" href="{maps_url}" target="_blank">🗺 Rota Al</a>'
+            "</div>"
+        )
 
     # iframe için veri listesi (JSON güvenli)
     def _open_label(v):
@@ -340,32 +362,43 @@ flex-shrink:0;border:1px solid rgba(255,255,255,0.18);overflow:hidden;">
 
     iframe_html = _map_iframe(center_lat, center_lon, venues_data, zoom=14)
 
-    return f"""
-<div style="margin-top:14px;">
-<div style="display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:thin;">
-{cards_html}
-</div>
-{iframe_html}
-</div>
-"""
+    return (
+        '<div class="map-panel">'
+        f'<div class="venue-strip">{cards_html}</div>'
+        f"{iframe_html}"
+        "</div>"
+    )
 
 
 def render_location_map(name: str, lat: float, lon: float) -> str:
-    """Tek pinli Leaflet haritası — spesifik lokasyon gösterimi için (iframe ile)."""
+    """Tek pinli harita — spesifik lokasyon için (iframe ile)."""
     maps_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
     venues_data = [{
-        "lat": lat,
-        "lon": lon,
-        "name": name,
-        "rating": None,
-        "review_count": None,
-        "review_count_str": "",
-        "maps_url": maps_url,
-        "btn_label": "Yol Tarifi Al",
-        "open_popup": True,
+        "lat": lat, "lon": lon, "name": name,
+        "rating": None, "review_count": None, "review_count_str": "",
+        "open_label": "", "maps_url": maps_url, "btn_label": "Yol Tarifi Al", "open_popup": True,
     }]
     iframe_html = _map_iframe(lat, lon, venues_data, zoom=15)
-    return f'<div style="margin-top:14px;">{iframe_html}</div>'
+    return f'<div class="map-panel">{iframe_html}</div>'
+
+
+def render_locations_map(coords: list[tuple[str, float, float]]) -> str:
+    """Çok pinli harita — LLM'in önerdiği birden fazla yer için (iframe ile)."""
+    if not coords:
+        return ""
+    venues_data = []
+    for name, lat, lon in coords:
+        maps_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
+        venues_data.append({
+            "lat": lat, "lon": lon, "name": name,
+            "rating": None, "review_count": None, "review_count_str": "",
+            "open_label": "", "maps_url": maps_url, "btn_label": "Yol Tarifi Al", "open_popup": False,
+        })
+    center_lat = sum(v["lat"] for v in venues_data) / len(venues_data)
+    center_lon = sum(v["lon"] for v in venues_data) / len(venues_data)
+    zoom = 13 if len(venues_data) > 1 else 15
+    iframe_html = _map_iframe(center_lat, center_lon, venues_data, zoom=zoom)
+    return f'<div class="map-panel">{iframe_html}</div>'
 
 
 def render_panel_placeholder(message: str) -> str:
@@ -380,245 +413,198 @@ def render_panel_placeholder(message: str) -> str:
 # ---- CSS -------------------------------------------------------------------
 
 CUSTOM_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-/* Gökyüzü gradyanı renk duraklarını kayıtlı property yap → yumuşak crossfade */
-@property --sky-1 { syntax: '<color>'; inherits: true; initial-value: #58aee9; }
-@property --sky-2 { syntax: '<color>'; inherits: true; initial-value: #a8d4f5; }
-@property --sky-3 { syntax: '<color>'; inherits: true; initial-value: #fdf0d5; }
+/* Accent renklerini kayıtlı property yap → tema değişiminde yumuşak crossfade */
+@property --accent { syntax: '<color>'; inherits: true; initial-value: #7c5cff; }
+@property --accent-strong { syntax: '<color>'; inherits: true; initial-value: #4f8cff; }
 
-/* ---- Tema paletleri (yalnızca değişkenler) ---- */
+/* ---- Ortak koyu palet + varsayılan accent (mor→mavi) ---- */
+body, body[data-theme="clear-day"], body[data-theme="night"], body[data-theme="clouds"],
+body[data-theme="rain"], body[data-theme="storm"], body[data-theme="snow"], body[data-theme="fog"] {
+    --bg-1: #0c1020;
+    --bg-2: #070912;
+    --ink: #e9ecf8;
+    --ink-soft: #aab3d0;
+    --ink-faint: #7a85ab;
+    --hero-ink: #f4f6ff;
+    --hero-soft: #b9c2e0;
+    --line: rgba(255, 255, 255, 0.10);
+    --line-strong: rgba(255, 255, 255, 0.18);
+    --surface: rgba(255, 255, 255, 0.045);
+    --surface-strong: rgba(255, 255, 255, 0.085);
+    --surface-hover: rgba(255, 255, 255, 0.13);
+    --on-accent: #0a0d1a;
+    color-scheme: dark;
+}
+
+/* ---- Havaya göre yalnızca accent / parlama / ikon değişir ---- */
 body, body[data-theme="clear-day"] {
-    --sky-1: #58aee9;
-    --sky-2: #a8d4f5;
-    --sky-3: #fdf0d5;
-    --accent: #f29f05;
-    --accent-strong: #e08700;
-    --on-accent: #2b1f06;
-    --ink: #16314a;
-    --ink-soft: #3d5a75;
-    --ink-faint: #6c87a0;
-    --hero-ink: #10283d;
-    --hero-soft: #2f4f6c;
-    --line: rgba(22, 49, 74, 0.14);
-    --surface: rgba(255, 255, 255, 0.45);
-    --surface-strong: rgba(255, 255, 255, 0.74);
-    --glow: rgba(242, 159, 5, 0.32);
-    --icon-main: #ffc233;
-    --icon-soft: #ffffff;
-    color-scheme: light;
+    --accent: #ffc24d;
+    --accent-strong: #f59e0b;
+    --glow: rgba(255, 174, 45, 0.30);
+    --icon-main: #ffce5a;
+    --icon-soft: #fff3d6;
 }
 body[data-theme="night"] {
-    --sky-1: #0a0f2c;
-    --sky-2: #16204a;
-    --sky-3: #2b3a6e;
-    --accent: #8ab4ff;
-    --accent-strong: #5f8fe8;
-    --on-accent: #0a132e;
-    --ink: #e9eefc;
-    --ink-soft: #b8c4e6;
-    --ink-faint: #8593c0;
-    --hero-ink: #f2f5ff;
-    --hero-soft: #c3cdea;
-    --line: rgba(233, 238, 252, 0.16);
-    --surface: rgba(255, 255, 255, 0.07);
-    --surface-strong: rgba(255, 255, 255, 0.13);
-    --glow: rgba(138, 180, 255, 0.26);
+    --accent: #8b7cff;
+    --accent-strong: #5f8bff;
+    --glow: rgba(124, 108, 255, 0.34);
     --icon-main: #ffe9a8;
     --icon-soft: #cfe0ff;
-    color-scheme: dark;
 }
 body[data-theme="clouds"] {
-    --sky-1: #8da9bf;
-    --sky-2: #b9cad8;
-    --sky-3: #edf2f6;
-    --accent: #4a7ba6;
-    --accent-strong: #3a6388;
-    --on-accent: #f4f9fd;
-    --ink: #243646;
-    --ink-soft: #4a6075;
-    --ink-faint: #76889a;
-    --hero-ink: #1c2c3a;
-    --hero-soft: #3c5266;
-    --line: rgba(36, 54, 70, 0.14);
-    --surface: rgba(255, 255, 255, 0.5);
-    --surface-strong: rgba(255, 255, 255, 0.78);
-    --glow: rgba(74, 123, 166, 0.26);
-    --icon-main: #7d9cb5;
+    --accent: #8aa0ff;
+    --accent-strong: #5f7fe8;
+    --glow: rgba(122, 144, 255, 0.30);
+    --icon-main: #aebbe0;
     --icon-soft: #ffffff;
-    color-scheme: light;
 }
 body[data-theme="rain"] {
-    --sky-1: #3f5b75;
-    --sky-2: #6e8aa3;
-    --sky-3: #b6c6d4;
-    --accent: #4fa3c7;
-    --accent-strong: #3c87ab;
-    --on-accent: #06222e;
-    --ink: #20323f;
-    --ink-soft: #486073;
-    --ink-faint: #7b8fa0;
-    --hero-ink: #eef4f9;
-    --hero-soft: #c2d2de;
-    --line: rgba(32, 50, 63, 0.15);
-    --surface: rgba(255, 255, 255, 0.42);
-    --surface-strong: rgba(255, 255, 255, 0.72);
-    --glow: rgba(79, 163, 199, 0.3);
-    --icon-main: #5d7f99;
-    --icon-soft: #4fa3c7;
-    color-scheme: light;
+    --accent: #4fc3f7;
+    --accent-strong: #4f8cff;
+    --glow: rgba(79, 170, 247, 0.32);
+    --icon-main: #8fb6d8;
+    --icon-soft: #4fc3f7;
 }
 body[data-theme="storm"] {
-    --sky-1: #131120;
-    --sky-2: #221f3a;
-    --sky-3: #3b3560;
     --accent: #ffd23f;
-    --accent-strong: #f0b90b;
-    --on-accent: #241c02;
-    --ink: #ece9f8;
-    --ink-soft: #c2bcdd;
-    --ink-faint: #8d86b3;
-    --hero-ink: #f4f2fc;
-    --hero-soft: #cdc7e6;
-    --line: rgba(236, 233, 248, 0.16);
-    --surface: rgba(255, 255, 255, 0.07);
-    --surface-strong: rgba(255, 255, 255, 0.12);
-    --glow: rgba(255, 210, 63, 0.24);
+    --accent-strong: #f0a90b;
+    --glow: rgba(255, 210, 63, 0.30);
     --icon-main: #ffd23f;
-    --icon-soft: #6f6899;
-    color-scheme: dark;
+    --icon-soft: #9a93c8;
 }
 body[data-theme="snow"] {
-    --sky-1: #c8e0f0;
-    --sky-2: #e4eff7;
-    --sky-3: #ffffff;
-    --accent: #3f8fc4;
-    --accent-strong: #2f74a3;
-    --on-accent: #f3f9fd;
-    --ink: #1f3b50;
-    --ink-soft: #46607a;
-    --ink-faint: #7e95a9;
-    --hero-ink: #183245;
-    --hero-soft: #3a566f;
-    --line: rgba(31, 59, 80, 0.12);
-    --surface: rgba(255, 255, 255, 0.55);
-    --surface-strong: rgba(255, 255, 255, 0.85);
-    --glow: rgba(63, 143, 196, 0.22);
-    --icon-main: #6db3e0;
-    --icon-soft: #b5d9f0;
-    color-scheme: light;
+    --accent: #9fd8ff;
+    --accent-strong: #6fa8ff;
+    --glow: rgba(159, 216, 255, 0.30);
+    --icon-main: #bfe2ff;
+    --icon-soft: #e8f4ff;
 }
 body[data-theme="fog"] {
-    --sky-1: #aab3ae;
-    --sky-2: #c9cfc9;
-    --sky-3: #ebece8;
-    --accent: #5f7268;
-    --accent-strong: #4b5c53;
-    --on-accent: #f2f5f1;
-    --ink: #2c3531;
-    --ink-soft: #54625b;
-    --ink-faint: #828e87;
-    --hero-ink: #232b27;
-    --hero-soft: #46534c;
-    --line: rgba(44, 53, 49, 0.13);
-    --surface: rgba(255, 255, 255, 0.5);
-    --surface-strong: rgba(255, 255, 255, 0.75);
-    --glow: rgba(95, 114, 104, 0.22);
-    --icon-main: #93a09a;
-    --icon-soft: #c5cdc8;
-    color-scheme: light;
+    --accent: #aab4e0;
+    --accent-strong: #8090c8;
+    --glow: rgba(170, 180, 224, 0.26);
+    --icon-main: #b6c0dc;
+    --icon-soft: #dfe5f2;
 }
 
-/* ---- Zemin ---- */
-html, body {
-    min-height: 100vh;
-}
+/* ---- Zemin (her zaman koyu; accent-tintli ambient parlama) ---- */
+html, body { min-height: 100vh; }
 body {
-    background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 55%, var(--sky-3) 100%) fixed !important;
-    transition: --sky-1 0.9s ease, --sky-2 0.9s ease, --sky-3 0.9s ease;
+    background:
+        radial-gradient(1100px 560px at 50% -10%,
+            color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 60%),
+        radial-gradient(900px 520px at 88% 4%,
+            color-mix(in srgb, var(--accent-strong) 10%, transparent) 0%, transparent 55%),
+        linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%) fixed !important;
+    transition: --accent 0.8s ease, --accent-strong 0.8s ease;
     color: var(--ink) !important;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
 gradio-app, .gradio-container,
 .gradio-container .main,
 .gradio-container .wrap,
-.gradio-container .app {
+.gradio-container .app,
+.gradio-container .block,
+.gradio-container .form {
     background: transparent !important;
+    border-color: transparent !important;
 }
 .gradio-container {
-    max-width: 1180px !important;
+    max-width: 1140px !important;
     margin: 0 auto !important;
-    padding-top: 24px !important;
+    padding-top: 18px !important;
     color: var(--ink) !important;
 }
+.gradio-container .prose,
+.gradio-container .prose * { color: var(--ink) !important; }
 footer { display: none !important; }
+.main-row { gap: 18px !important; align-items: flex-start !important; }
 
 /* Tema geçişinde bileşen renkleri de yumuşasın */
-.wx-panel, .chat-surface, .chat-area .message.user, .chat-area .message.bot,
-.suggestion-btn, button.primary, textarea, input[type="text"] {
+.wx-panel, .chat-surface, .chat-area .flex-wrap.user, .chat-area .flex-wrap.bot,
+.suggestion-btn, button.primary, textarea, input[type="text"], .wx-chip,
+.venue-card, .brand-logo {
     transition: background-color 0.6s ease, color 0.6s ease,
                 border-color 0.6s ease, box-shadow 0.6s ease !important;
 }
 
-/* ---- Hero ---- */
-.hero {
-    text-align: center;
+/* ---- Üst bar (marka) ---- */
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 4px 4px 16px 4px !important;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--line);
     background: transparent !important;
-    padding: 4px 0 18px 0 !important;
 }
-.hero .eyebrow {
-    display: inline-block;
-    font-size: 11px;
-    letter-spacing: 0.24em;
-    text-transform: uppercase;
-    color: var(--hero-soft) !important;
-    font-weight: 700;
-    margin-bottom: 10px;
-}
-.hero h1 {
-    font-weight: 800 !important;
-    font-size: 2.1rem !important;
-    line-height: 1.15 !important;
-    letter-spacing: -0.6px !important;
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 900;
+    font-size: 1.42rem;
+    letter-spacing: -0.5px;
     color: var(--hero-ink) !important;
-    margin: 0 auto 6px auto !important;
 }
-.hero p {
-    font-size: 15px !important;
-    line-height: 1.5 !important;
+.brand-logo {
+    font-size: 1.55rem;
+    line-height: 1;
+    background: linear-gradient(150deg, var(--accent), var(--accent-strong));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px 10px var(--glow));
+}
+.brand-tag {
+    font-size: 12.5px;
+    font-weight: 500;
     color: var(--hero-soft) !important;
-    max-width: 560px;
-    margin: 0 auto !important;
+    letter-spacing: 0.01em;
 }
 
 /* ---- Hava paneli ---- */
+.panel-col { position: sticky; top: 14px; align-self: flex-start; }
 .wx-panel {
+    position: relative;
+    overflow: hidden;
     background: var(--surface) !important;
-    backdrop-filter: blur(16px) saturate(130%);
-    -webkit-backdrop-filter: blur(16px) saturate(130%);
+    backdrop-filter: blur(22px) saturate(125%);
+    -webkit-backdrop-filter: blur(22px) saturate(125%);
     border: 1px solid var(--line);
-    border-radius: 24px;
-    padding: 34px 22px;
+    border-radius: 22px;
+    padding: 30px 22px 24px;
     text-align: center;
-    box-shadow: 0 18px 50px rgba(10, 20, 35, 0.14);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }
-.panel-col { position: sticky; top: 16px; align-self: flex-start; }
+.wx-panel::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.8;
+}
 .wx-icon svg {
-    width: 112px;
-    height: 112px;
+    width: 104px;
+    height: 104px;
     display: block;
-    margin: 0 auto 10px auto;
-    filter: drop-shadow(0 6px 14px rgba(10, 20, 35, 0.18));
+    margin: 0 auto 6px auto;
+    filter: drop-shadow(0 8px 22px var(--glow));
 }
 .wx-temp {
-    font-size: 64px;
+    font-size: 60px;
     font-weight: 800;
     letter-spacing: -2px;
     line-height: 1;
     color: var(--ink);
 }
 .wx-feels {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 600;
     color: var(--ink-faint);
     margin-top: 6px;
@@ -630,82 +616,133 @@ footer { display: none !important; }
     margin-top: 12px;
 }
 .wx-city {
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--ink-faint);
-    margin-top: 4px;
+    margin-top: 5px;
 }
 .wx-panel-empty .wx-cond { font-weight: 600; color: var(--ink-faint); }
-.wx-meta {
-    font-size: 12px;
+.wx-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 16px;
+}
+.wx-chip {
+    font-size: 11.5px;
     font-weight: 600;
-    color: var(--ink-faint);
-    margin-top: 10px;
-    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    background: var(--surface-strong);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 11px;
+    letter-spacing: 0.02em;
 }
 
 /* ---- Chat yüzeyi ---- */
 .chat-surface {
     background: var(--surface) !important;
-    backdrop-filter: blur(16px) saturate(130%);
-    -webkit-backdrop-filter: blur(16px) saturate(130%);
+    backdrop-filter: blur(22px) saturate(125%);
+    -webkit-backdrop-filter: blur(22px) saturate(125%);
     border: 1px solid var(--line) !important;
-    border-radius: 24px !important;
-    box-shadow: 0 18px 50px rgba(10, 20, 35, 0.14) !important;
+    border-radius: 22px !important;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45) !important;
     padding: 18px !important;
 }
 .chat-surface label, .chat-surface span, .chat-surface p { color: var(--ink) !important; }
 
-.chat-area {
+/* Kaydırma kabı, satırlar ve Gradio'nun varsayılan opak zeminleri şeffaf */
+.chat-area, .chat-area .wrapper, .chat-area .bubble-wrap,
+.chat-area .message-wrap, .chat-area .message-row {
     background: transparent !important;
     border: none !important;
+    box-shadow: none !important;
 }
-.chat-area .message.user,
-.chat-area .message-bubble-border.user {
+
+/* Asıl balon = .flex-wrap (TEK görünür katman) */
+.chat-area .flex-wrap { padding: 11px 15px !important; }
+.chat-area .flex-wrap.user {
     background: linear-gradient(150deg, var(--accent), var(--accent-strong)) !important;
-    color: var(--on-accent) !important;
     border: none !important;
     border-radius: 16px 16px 4px 16px !important;
+    box-shadow: 0 10px 26px var(--glow) !important;
     font-weight: 600 !important;
-    box-shadow: 0 8px 22px var(--glow) !important;
 }
-.chat-area .message.user p,
-.chat-area .message.user strong { color: var(--on-accent) !important; }
-.chat-area .message.bot,
-.chat-area .message-bubble-border.bot {
+.chat-area .flex-wrap.bot {
     background: var(--surface-strong) !important;
-    color: var(--ink) !important;
     border: 1px solid var(--line) !important;
     border-radius: 16px 16px 16px 4px !important;
-    box-shadow: 0 6px 18px rgba(10, 20, 35, 0.08) !important;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.30) !important;
 }
-.chat-area .message.bot p,
-.chat-area .message.bot li,
-.chat-area .message.bot strong,
-.chat-area .message.bot h1,
-.chat-area .message.bot h2,
-.chat-area .message.bot h3 { color: var(--ink) !important; }
-.chat-area .message.bot em { color: var(--accent-strong) !important; }
-.chat-area .message.bot a { color: var(--accent-strong) !important; font-weight: 600; }
-.chat-area .message.bot code {
-    background: var(--surface) !important;
-    color: var(--ink) !important;
+
+/* İç sarmalayıcılar (message + tıklanabilir button) tüm kutu stillerinden arındırılır */
+.chat-area .message,
+.chat-area .flex-wrap button {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    cursor: default !important;
+}
+.chat-area .flex-wrap .prose p:first-child,
+.chat-area .flex-wrap .prose ul:first-child,
+.chat-area .flex-wrap .prose ol:first-child { margin-top: 0 !important; }
+.chat-area .flex-wrap .prose p:last-child,
+.chat-area .flex-wrap .prose ul:last-child,
+.chat-area .flex-wrap .prose ol:last-child { margin-bottom: 0 !important; }
+
+/* Metin renkleri */
+.chat-area .flex-wrap.user,
+.chat-area .flex-wrap.user * { color: var(--on-accent) !important; }
+.chat-area .flex-wrap.bot,
+.chat-area .flex-wrap.bot p,
+.chat-area .flex-wrap.bot li,
+.chat-area .flex-wrap.bot strong,
+.chat-area .flex-wrap.bot h1,
+.chat-area .flex-wrap.bot h2,
+.chat-area .flex-wrap.bot h3 { color: var(--ink) !important; }
+.chat-area .flex-wrap.bot em { color: var(--accent) !important; }
+.chat-area .flex-wrap.bot a { color: var(--accent) !important; font-weight: 600; }
+.chat-area .flex-wrap.bot code {
+    background: rgba(0, 0, 0, 0.28) !important;
+    color: #d6def5 !important;
     border: 1px solid var(--line) !important;
     border-radius: 6px !important;
     padding: 1px 6px !important;
     font-size: 0.9em;
 }
+.chat-area .flex-wrap.bot hr {
+    border: none !important;
+    border-top: 1px solid var(--line) !important;
+    margin: 12px 0 !important;
+    background: transparent !important;
+}
+
+/* Kopyala / aksiyon ikon butonları: sade, çerçevesiz */
+.chat-area .message-buttons { border: none !important; background: transparent !important; }
+.chat-area .message-buttons button,
+.chat-area button.action {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--ink-faint) !important;
+}
+.chat-area .message-buttons button:hover,
+.chat-area button.action:hover { color: var(--ink) !important; }
+.chat-area button svg { color: inherit !important; opacity: 0.85; }
 
 /* ---- Giriş alanı ---- */
-.chat-input-row { margin-top: 12px !important; }
+.chat-input-row { margin-top: 12px !important; gap: 8px !important; }
 textarea, input[type="text"] {
     background: var(--surface-strong) !important;
     border: 1px solid var(--line) !important;
     border-radius: 14px !important;
     color: var(--ink) !important;
-    font-size: 16px !important;
+    font-size: 15.5px !important;
 }
 textarea::placeholder, input::placeholder {
     color: var(--ink-faint) !important;
@@ -729,18 +766,21 @@ button.primary {
 }
 button.primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 14px 32px var(--glow) !important;
+    box-shadow: 0 14px 34px var(--glow) !important;
 }
-.chat-surface button:not(.primary):not(.suggestion-btn) {
+button.loc-btn, .loc-btn button,
+button.clear-btn, .clear-btn button {
     background: var(--surface-strong) !important;
     border: 1px solid var(--line) !important;
     color: var(--ink-soft) !important;
     border-radius: 12px !important;
     font-weight: 600 !important;
 }
-.chat-surface button:not(.primary):not(.suggestion-btn):hover {
+button.loc-btn:hover, .loc-btn button:hover,
+button.clear-btn:hover, .clear-btn button:hover {
     border-color: var(--accent) !important;
     color: var(--ink) !important;
+    background: var(--surface-hover) !important;
 }
 
 /* ---- Boş durum (karşılama + öneri kartları) ---- */
@@ -753,14 +793,15 @@ button.primary:hover {
 }
 .empty-state .greeting {
     text-align: center;
-    margin-bottom: 18px;
+    margin-bottom: 20px;
 }
-.empty-state .greeting .wave { font-size: 38px; line-height: 1; }
+.empty-state .greeting .wave { font-size: 40px; line-height: 1; }
 .empty-state .greeting h2 {
-    font-size: 22px;
+    font-size: 23px;
     font-weight: 800;
     color: var(--ink);
-    margin: 10px 0 6px 0;
+    margin: 12px 0 6px 0;
+    letter-spacing: -0.3px;
 }
 .empty-state .greeting p {
     font-size: 14.5px;
@@ -781,42 +822,106 @@ button.suggestion-btn {
     min-height: 64px;
     white-space: normal !important;
     line-height: 1.4 !important;
-    box-shadow: 0 4px 14px rgba(10, 20, 35, 0.06) !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25) !important;
     transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease,
                 box-shadow 0.15s ease, background-color 0.6s ease !important;
 }
 button.suggestion-btn:hover {
     border-color: var(--accent) !important;
     color: var(--ink) !important;
+    background: var(--surface-hover) !important;
     transform: translateY(-2px);
-    box-shadow: 0 10px 24px rgba(10, 20, 35, 0.12) !important;
+    box-shadow: 0 14px 30px var(--glow) !important;
 }
+
+/* ---- Venue kartları ---- */
+.map-panel { margin-top: 14px; }
+.venue-strip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 4px 2px 12px;
+    scrollbar-width: thin;
+}
+.venue-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 158px;
+    max-width: 190px;
+    flex-shrink: 0;
+    gap: 5px;
+    background: var(--surface-strong);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 9px 10px 11px;
+    overflow: hidden;
+}
+.venue-card__photo {
+    width: 100%;
+    height: 88px;
+    object-fit: cover;
+    border-radius: 9px;
+    margin-bottom: 2px;
+}
+.venue-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px;
+}
+.venue-card__name {
+    font-weight: 650;
+    font-size: 0.82rem;
+    line-height: 1.3;
+    color: var(--ink);
+}
+.venue-badge {
+    font-size: 0.66rem;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 2px 6px;
+    white-space: nowrap;
+}
+.venue-badge--open { color: #34e0a1; background: rgba(52, 224, 161, 0.15); }
+.venue-badge--closed { color: #ff7a7a; background: rgba(255, 122, 122, 0.15); }
+.venue-card__meta { font-size: 0.74rem; color: var(--ink-soft); }
+.venue-card__dist { font-size: 0.72rem; color: var(--ink-faint); }
+.venue-card__route {
+    margin-top: 3px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent) !important;
+    text-decoration: none;
+}
+.venue-card__route:hover { text-decoration: underline; }
 
 /* ---- Kaydırma çubuğu ---- */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent-strong); }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* ---- Footer ---- */
 .footer-note {
     text-align: center;
     background: transparent !important;
-    margin-top: 20px;
+    margin-top: 22px;
     padding-top: 12px;
     border-top: 1px solid var(--line);
 }
 .footer-note p,
 .footer-note strong { color: var(--ink-faint) !important; font-weight: 600 !important; }
+.footer-note hr { display: none; }
 
 /* ---- Mobil ---- */
 @media (max-width: 860px) {
     .main-row { flex-direction: column !important; }
     .panel-col { position: static; width: 100% !important; }
     .wx-panel { padding: 22px 18px; }
-    .wx-icon svg { width: 84px; height: 84px; }
-    .wx-temp { font-size: 48px; }
-    .hero h1 { font-size: 1.6rem !important; }
+    .wx-icon svg { width: 88px; height: 88px; }
+    .wx-temp { font-size: 50px; }
+    .brand { font-size: 1.25rem; }
+    .brand-tag { display: none; }
     .empty-state { min-height: 360px; }
 }
 """

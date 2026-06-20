@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import os
+import threading
 import time
 import urllib.parse
 from datetime import date
@@ -30,6 +31,11 @@ _geocode_cache: dict[str, tuple[float, float]] = {}
 _venues_cache: dict[tuple[str, str, int], list[dict]] = {}
 
 _LAST_VENUES: list[dict] = []
+
+# Thread-safety locks (parallel venue searches için)
+_geocode_lock = threading.Lock()
+_venues_cache_lock = threading.Lock()
+_last_venues_lock = threading.Lock()
 
 
 def get_last_venues() -> list[dict]:
@@ -185,33 +191,45 @@ def _extract_name_and_coords(
 
 
 def geocode_city(city: str, timeout: float = 10.0) -> tuple[float, float]:
-    """Return (lat, lon) for `city` via Nominatim. Caches by lowercased city."""
+    """Return (lat, lon) for `city` via Nominatim. Caches by lowercased city.
+
+    Double-checked locking: fast cache hit without lock, then serialised HTTP
+    call inside _geocode_lock to prevent Nominatim rate-limit races.
+    """
     key = city.strip().lower()
+    # Fast path — no lock needed for a dict membership check in CPython
     if key in _geocode_cache:
         return _geocode_cache[key]
 
-    _wait_for_nominatim_window()
-    try:
-        resp = requests.get(
-            NOMINATIM_URL,
-            params={"q": city, "format": "json", "limit": 1},
-            headers={"User-Agent": _user_agent(), "Accept-Language": "tr,en"},
-            timeout=timeout,
-        )
-    except requests.RequestException as e:
-        raise ConnectionError(f"Nominatim erişim hatası: {e}") from e
+    with _geocode_lock:
+        # Second check: another thread may have populated the cache while we waited
+        if key in _geocode_cache:
+            return _geocode_cache[key]
 
-    if resp.status_code != 200:
-        raise ConnectionError(f"Nominatim HTTP {resp.status_code}")
+        # Rate-limit enforcement is serialised inside the lock
+        _wait_for_nominatim_window()
+        try:
+            resp = requests.get(
+                NOMINATIM_URL,
+                params={"q": city, "format": "json", "limit": 1},
+                headers={"User-Agent": _user_agent(), "Accept-Language": "tr,en"},
+                timeout=timeout,
+            )
+        except requests.RequestException as e:
+            raise ConnectionError(f"Nominatim erişim hatası: {e}") from e
 
-    results = resp.json()
-    if not results:
-        raise ValueError(f"Şehir bulunamadı: {city}")
+        if resp.status_code != 200:
+            raise ConnectionError(f"Nominatim HTTP {resp.status_code}")
 
-    lat = float(results[0]["lat"])
-    lon = float(results[0]["lon"])
-    _geocode_cache[key] = (lat, lon)
-    return lat, lon
+        results = resp.json()
+        if not results:
+            raise ValueError(f"Şehir bulunamadı: {city}")
+
+        lat = float(results[0]["lat"])
+        lon = float(results[0]["lon"])
+        _geocode_cache[key] = (lat, lon)
+
+    return _geocode_cache[key]
 
 
 def _photo_url(photo_reference: str, max_width: int = 400) -> str:
@@ -381,10 +399,16 @@ def find_venues(
     global _LAST_VENUES
 
     cache_key = (city.strip().lower(), category.strip().lower(), int(radius_km))
+
+    # In-memory cache check (thread-safe read then double-check inside lock)
     if cache_key in _venues_cache:
-        result = _venues_cache[cache_key][:limit]
-        _LAST_VENUES = result
-        return result
+        with _venues_cache_lock:
+            cached = _venues_cache.get(cache_key)
+        if cached is not None:
+            result = cached[:limit]
+            with _last_venues_lock:
+                _LAST_VENUES = result
+            return result
 
     today = date.today().isoformat()
     file_cache_key = (f"venues_{category.lower()}", city.lower(), today)
@@ -400,10 +424,20 @@ def find_venues(
             tags = _normalize_category(category)
             return _find_venues_overpass(lat, lon, tags, radius_m, limit, timeout)
 
-    venues = get_or_fetch(file_cache_key, _fetch)
-    _venues_cache[cache_key] = venues
-    _LAST_VENUES = venues[:limit]
-    return venues[:limit]
+    # Prevent duplicate fetches for same key from parallel threads
+    with _venues_cache_lock:
+        if cache_key in _venues_cache:
+            result = _venues_cache[cache_key][:limit]
+            with _last_venues_lock:
+                _LAST_VENUES = result
+            return result
+        venues = get_or_fetch(file_cache_key, _fetch)
+        _venues_cache[cache_key] = venues
+
+    result = venues[:limit]
+    with _last_venues_lock:
+        _LAST_VENUES = result
+    return result
 
 
 def format_venues_for_llm(venues: list[dict], category: str, city: str, lang: str = "tr") -> str:

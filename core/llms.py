@@ -29,3 +29,10 @@ planner_llm = ChatOpenAI(
     temperature=0.2,
     openai_api_key=_api_key,
 )
+
+# Zaman planı üretimi (düşük sıcaklık → tutarlı format)
+itinerary_llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0.3,
+    openai_api_key=_api_key,
+)

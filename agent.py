@@ -27,6 +27,7 @@ def run_skywise(city: str, preferences: str) -> dict:
         "humidity": weather["humidity"],
         "wind_speed": weather["wind_speed"],
         "recommendation": final.get("recommendation", ""),
+        "itinerary": final.get("itinerary") or "",
     }
 
 

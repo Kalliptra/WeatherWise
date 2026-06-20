@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Literal, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 
-from core.llms import evaluator_llm, planner_llm, react_llm
+from core.llms import evaluator_llm, itinerary_llm, planner_llm, react_llm
 from core.prompts import get_prompt
 from core.state import Evaluation, PlannedCall, PlannerOutput, SkyWiseState
 from tools.uv import get_uv_index
-from tools.venue import find_venues, format_venues_for_llm
+from tools.venue import _USE_GOOGLE, find_venues, format_venues_for_llm, geocode_city
 from tools.weather import (
     calculate_comfort_index,
     format_weather_summary,
@@ -122,7 +123,12 @@ def execute_node(state: SkyWiseState) -> dict:
     comfort_str = state.get("comfort")
     weather_summary = state.get("weather_summary")
 
-    for call in plan:
+    # Venue ve diğer çağrıları ayır
+    venue_calls = [c for c in plan if c["tool"] == "venue_search"]
+    non_venue_calls = [c for c in plan if c["tool"] != "venue_search"]
+
+    # 1. Sıralı: hava/UV/tahmin/konfor çağrıları (değişmez)
+    for call in non_venue_calls:
         name = call["tool"]
         args = call.get("args") or {}
         try:
@@ -130,7 +136,6 @@ def execute_node(state: SkyWiseState) -> dict:
                 city = args.get("city") or state["city"]
                 w = get_weather(city, lang=lang)
                 weather_obj = w
-                # UV fetch alongside weather (failure is non-blocking)
                 if uv_obj is None:
                     try:
                         uv_obj = get_uv_index(city, lang=lang)
@@ -159,14 +164,38 @@ def execute_node(state: SkyWiseState) -> dict:
                     humidity = args["humidity"]
                     wind_speed = args["wind_speed"]
                 comfort_str = calculate_comfort_index(temperature, humidity, wind_speed)
-            elif name == "venue_search":
-                city = args.get("city") or state["city"]
-                category = args.get("category", "attraction")
-                radius_km = int(args.get("radius_km", 5))
-                vlist = find_venues(city, category, radius_km=radius_km)
-                venues[category] = format_venues_for_llm(vlist, category, city, lang=lang)
         except (ValueError, ConnectionError, KeyError) as e:
             errors.append(f"[tool {name} hata]: {e}")
+
+    # 2. Paralel: venue aramaları
+    if venue_calls:
+        # Geocode cache'i ısıt → tüm thread'ler aynı şehir için cache hit alır
+        try:
+            geocode_city(state["city"])
+        except Exception:
+            pass
+
+        # Overpass rate-limit riski varsa worker sayısını düşür
+        max_workers = 4 if _USE_GOOGLE else 2
+
+        def _run_venue(call: PlannedCall) -> tuple[str, str]:
+            args = call.get("args") or {}
+            category = args.get("category", "attraction")
+            radius_km = int(args.get("radius_km", 5))
+            city = args.get("city") or state["city"]
+            vlist = find_venues(city, category, radius_km=radius_km)
+            return category, format_venues_for_llm(vlist, category, city, lang=lang)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(_run_venue, c): c for c in venue_calls}
+            for fut in as_completed(futures):
+                call = futures[fut]
+                try:
+                    cat, formatted = fut.result()
+                    venues[cat] = formatted
+                except (ValueError, ConnectionError, KeyError) as e:
+                    cat = (call.get("args") or {}).get("category", "?")
+                    errors.append(f"[venue_search {cat} hata]: {e}")
 
     if weather_obj is not None:
         out["weather"] = weather_obj
@@ -260,17 +289,68 @@ def evaluate_node(state: SkyWiseState) -> dict:
     return {"evaluation": evaluation, "history": [summary_line]}
 
 
-def refine_router(state: SkyWiseState) -> Literal["plan", "END"]:
+def refine_router(state: SkyWiseState) -> Literal["plan", "itinerary"]:
     e = state.get("evaluation") or {}
     i = state.get("iteration", 1)
     score = e.get("score")
     approved = e.get("approved", False)
 
     if approved and (score is None or score >= APPROVAL_SCORE_THRESHOLD):
-        return "END"
+        return "itinerary"
     if i >= MAX_ITERATIONS:
-        return "END"
+        return "itinerary"
     return "plan"
+
+
+def itinerary_node(state: SkyWiseState) -> dict:
+    """Öneri metnini alıp günlük zaman planı üretir."""
+    lang = _lang(state)
+
+    sections: list[str] = []
+    if state.get("weather_summary"):
+        sections.append("HAVA:\n" + state["weather_summary"])
+    if state.get("comfort"):
+        sections.append(state["comfort"])
+    if state.get("forecast"):
+        sections.append("TAHMİN:\n" + state["forecast"])
+
+    weather = state.get("weather") or {}
+    mins_to_sunset = weather.get("minutes_to_sunset")
+    if mins_to_sunset is not None and 0 < mins_to_sunset <= 60:
+        label = f"GÜN BATIMI: {mins_to_sunset} dakika kaldı" if lang == "tr" else f"SUNSET: {mins_to_sunset} minutes away"
+        sections.append(label)
+
+    uv = state.get("uv") or {}
+    if uv.get("uv_index") is not None:
+        uv_info = f"UV İndeksi: {uv['uv_index']} — {uv.get('uv_advice_tr', '')}" if lang == "tr" \
+            else f"UV Index: {uv['uv_index']} — {uv.get('uv_advice_en', '')}"
+        sections.append(uv_info)
+
+    for cat, block in (state.get("venues") or {}).items():
+        sections.append(block)
+
+    sections.append(
+        f"KULLANICI TERCİHLERİ: {state.get('preferences') or 'belirtilmemiş'}"
+        if lang == "tr" else
+        f"USER PREFERENCES: {state.get('preferences') or 'not specified'}"
+    )
+    sections.append(
+        f"AKTİVİTE ÖNERİLERİ:\n{state.get('recommendation', '')}"
+        if lang == "tr" else
+        f"ACTIVITY SUGGESTIONS:\n{state.get('recommendation', '')}"
+    )
+
+    human = "\n\n".join(sections) + (
+        "\n\nLütfen günlük zaman planı oluştur." if lang == "tr"
+        else "\n\nPlease create a day itinerary."
+    )
+
+    raw = itinerary_llm.invoke([
+        SystemMessage(content=get_prompt("itinerary", lang)),
+        HumanMessage(content=human),
+    ]).content
+
+    return {"itinerary": raw.strip() or None}
 
 
 # ---- Graph kurulumu ----
@@ -280,13 +360,15 @@ _graph_builder.add_node("plan", plan_node)
 _graph_builder.add_node("execute", execute_node)
 _graph_builder.add_node("recommend", recommend_node)
 _graph_builder.add_node("evaluate", evaluate_node)
+_graph_builder.add_node("itinerary", itinerary_node)
 
 _graph_builder.add_edge(START, "plan")
 _graph_builder.add_edge("plan", "execute")
 _graph_builder.add_edge("execute", "recommend")
 _graph_builder.add_edge("recommend", "evaluate")
 _graph_builder.add_conditional_edges(
-    "evaluate", refine_router, {"plan": "plan", "END": END}
+    "evaluate", refine_router, {"plan": "plan", "itinerary": "itinerary"}
 )
+_graph_builder.add_edge("itinerary", END)
 
 compiled_graph = _graph_builder.compile()
