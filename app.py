@@ -101,6 +101,25 @@ FORCE_DARK_JS = """
         chatInput.dispatchEvent(new Event('input', { bubbles: true }));
         chatInput.focus();
     });
+
+    function scrollChatToBottom() {
+        var el = document.querySelector('.chat-area .bubble-wrap, .chat-area > div, .chat-area');
+        if (el) el.scrollTop = el.scrollHeight;
+    }
+
+    var chatObserver = new MutationObserver(function() {
+        scrollChatToBottom();
+    });
+
+    function attachChatObserver() {
+        var chatEl = document.querySelector('.chat-area');
+        if (chatEl) {
+            chatObserver.observe(chatEl, { childList: true, subtree: true, characterData: true });
+        } else {
+            setTimeout(attachChatObserver, 300);
+        }
+    }
+    attachChatObserver();
 }
 """
 
