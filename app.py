@@ -23,7 +23,7 @@ import os  # noqa: E402
 
 import gradio as gr  # noqa: E402
 
-from chat import chat_skywise, clear_last_location, get_last_locations, generate_next_suggestion  # noqa: E402
+from chat import chat_skywise, clear_last_location, get_last_locations, generate_next_suggestion, generate_location_suggestions, set_user_location  # noqa: E402
 from ui_theme import (  # noqa: E402
     CUSTOM_CSS,
     render_locations_map,
@@ -221,14 +221,25 @@ def load_default_city():
         return render_panel_placeholder("Hava durumu alınamadı."), "clear-day"
 
 
+_GENEL_ONERILER = [
+    "Bulunduğum yerde bugün hava nasıl?",
+    "Yakınımda ne yapabilirim?",
+    "What's the weather like near me today?",
+    "Recommend something to do nearby",
+]
+
+
 def apply_geolocation(coords: str):
     try:
         lat, lon = (float(x) for x in (coords or "").split(","))
         weather = get_weather_by_coords(lat, lon)
-        return render_weather_panel(weather), weather_to_theme(weather)
+        set_user_location(weather["city"])
+        suggestions = generate_location_suggestions(weather["city"], weather["country"], weather)
+        btn_updates = [gr.update(value=s) for s in suggestions]
+        return render_weather_panel(weather), weather_to_theme(weather), *btn_updates
     except Exception:
-        # Konum reddedildi/alınamadı → varsayılan şehir zaten ekranda
-        return gr.update(), gr.update()
+        btn_updates = [gr.update(value=s) for s in _GENEL_ONERILER]
+        return gr.update(), gr.update(), *btn_updates
 
 
 with gr.Blocks(
@@ -321,7 +332,7 @@ with gr.Blocks(
 
     demo.load(load_default_city, None, [weather_panel, theme_state], api_name=False)
     demo.load(None, None, geo_coords, js=GEO_JS, api_name=False)
-    geo_coords.change(apply_geolocation, geo_coords, [weather_panel, theme_state], api_name=False)
+    geo_coords.change(apply_geolocation, geo_coords, [weather_panel, theme_state, sug1, sug2, sug3, sug4], api_name=False)
 
 
 if __name__ == "__main__":

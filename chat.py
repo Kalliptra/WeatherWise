@@ -73,6 +73,11 @@ def clear_last_location() -> None:
     _last_locations = []
 
 
+def set_user_location(city: str) -> None:
+    global _user_location
+    _user_location = city or None
+
+
 def _detect_language(text: str) -> str:
     if any(c in _TURKISH_CHARS for c in text):
         return "tr"
@@ -528,6 +533,40 @@ def chat_skywise(messages: list[dict]) -> Iterator[str]:
     yield from _stream_chunks(final_text)
 
 
+_GENEL_ONERILER = [
+    "Bulunduğum yerde bugün hava nasıl?",
+    "Yakınımda ne yapabilirim?",
+    "What's the weather like near me today?",
+    "Recommend something to do nearby",
+]
+
+
+def generate_location_suggestions(city: str, country: str, weather: dict) -> list[str]:
+    try:
+        lang_instruction = "Türkçe yaz." if country == "TR" else "Write in English."
+        sys_msg = (
+            f"You are generating example prompts that a USER would type to a weather-based activity assistant. "
+            f"Generate exactly 4 short prompts written from the USER's perspective (first person), "
+            f"as if the user is asking the AI for recommendations or information. "
+            f"City: {city}. Current weather: {weather.get('temperature', '?')}°C, {weather.get('condition', '')}. "
+            f"{lang_instruction} "
+            f"Each prompt must be max 60 characters, sound natural, and be city/weather specific. "
+            f"Examples of the correct style: 'Bugün İstanbul'da ne yapabilirim?', 'Kâğıthane'de akşam aktiviteleri öner'. "
+            f"Output only the 4 prompts, one per line, no numbering, no bullet points."
+        )
+        response = react_llm.invoke(
+            [SystemMessage(content=sys_msg), HumanMessage(content="Generate suggestions.")],
+            config={"max_tokens": 250},
+        )
+        lines = [l.strip().strip('"').strip("'") for l in (response.content or "").split("\n") if l.strip()]
+        suggestions = [l for l in lines if l][:4]
+        if len(suggestions) < 4:
+            return _GENEL_ONERILER
+        return suggestions
+    except Exception:
+        return _GENEL_ONERILER
+
+
 def generate_next_suggestion(history: list[dict]) -> tuple[str, str]:
     """Konuşma bağlamına göre (placeholder_hint, full_suggestion) döndürür.
 
@@ -549,15 +588,19 @@ def generate_next_suggestion(history: list[dict]) -> tuple[str, str]:
 
         if lang == "tr":
             sys_msg = (
-                "Aşağıdaki konuşmaya bakarak kullanıcının sormak isteyeceği "
-                "TAM OLARAK BİR follow-up soru üret. "
-                "Sadece soruyu yaz, başka hiçbir şey ekleme. Maksimum 80 karakter. Türkçe yaz."
+                "Aşağıdaki konuşmaya bakarak, kullanıcının bir hava durumu aktivite asistanına "
+                "yazacağı TAM OLARAK BİR follow-up mesaj üret. "
+                "Mesaj kullanıcı bakış açısından olmalı (örn: 'Yakınımda kafe öner', 'Yarın hava nasıl olacak?'). "
+                "AI'ın kullanıcıya sorduğu sorular değil, kullanıcının AI'a yazdığı prompt tarzında olmalı. "
+                "Sadece mesajı yaz, başka hiçbir şey ekleme. Maksimum 80 karakter. Türkçe yaz."
             )
         else:
             sys_msg = (
-                "Given the conversation below, generate EXACTLY ONE follow-up question "
-                "the user would likely ask next. "
-                "Output only the question, nothing else. Maximum 80 characters. Write in English."
+                "Given the conversation below, generate EXACTLY ONE follow-up message "
+                "that the USER would type to a weather-based activity assistant. "
+                "Write it from the user's perspective (e.g. 'Recommend a cafe nearby', 'What about tomorrow?'). "
+                "Not a question the AI asks, but a prompt the user sends. "
+                "Output only the message, nothing else. Maximum 80 characters. Write in English."
             )
 
         response = react_llm.invoke(

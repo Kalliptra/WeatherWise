@@ -1835,5 +1835,39 @@
         "photo_url": "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=AaVGc3lJY4kBp-_lKmApdxmL_OUrkcAwZ-T7qZqRxCVIOPGOl5U29oGwGzzpkXv2FL8Ep0UpEBDBjX5qdzN6aUOt4QG270QFWiacxDI3Oo1ytRBGVYCe70rAwqMsQ2lS8D5JVNtJfzLVeBaHZJaUb0DzKUjf8DekOh5er9aWSn1RiorGakFweeRfaUOeOhbWK9ee9eWx-37Mi93sdmyVI2cuRKGIOr6qBvkrEaltNT6aKPcATy8EDLCrqghU6oO63PWPqdjw7AtwZ0fyAbp6KOfomkO8AJBO4FrFcjaZ6dYinazUM8vHWyIfUBxHPwqZ-Kur3vUEUr2r12wn2S_SL8nEbCUounJv1VdJq-nauJf_mHY_6YpsR_rzjuIpslRJ8NqYZ69vmYQ53F1N9qr8ak628q5mNhsz60T9V40E4HQl_Tk&key=AIzaSyCMHakJNz6slqd5RtllgDx5Vw5CF90pP-c"
       }
     ]
+  },
+  "weather|kâğıthane|2026-06-21": {
+    "date": "2026-06-21",
+    "data": {
+      "city": "Kâğıthane",
+      "country": "TR",
+      "temperature": 20.6,
+      "feels_like": 21.3,
+      "humidity": 100,
+      "wind_speed": 8.6,
+      "condition": "açık",
+      "condition_id": 800,
+      "visibility": 10,
+      "icon": "01n",
+      "is_night": true,
+      "sunset_unix": 1782063593,
+      "sunset_str": "20:39",
+      "minutes_to_sunset": 1110,
+      "is_rainy": false,
+      "is_stormy": false,
+      "is_snowy": false,
+      "is_foggy": false,
+      "is_clear": true
+    }
+  },
+  "uv|kâğıthane|2026-06-21": {
+    "date": "2026-06-21",
+    "data": {
+      "uv_index": 0,
+      "uv_level_tr": "düşük",
+      "uv_level_en": "low",
+      "uv_advice_tr": "Güneş kremi gerekmez.",
+      "uv_advice_en": "No sunscreen needed."
+    }
   }
 }
