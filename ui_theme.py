@@ -769,7 +769,14 @@ button.primary:hover {
     transform: translateY(-1px);
     box-shadow: 0 14px 34px var(--glow) !important;
 }
-button.loc-btn, .loc-btn button,
+button.loc-btn, .loc-btn button {
+    background: var(--surface-strong) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--ink-soft) !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+}
 button.clear-btn, .clear-btn button {
     background: var(--surface-strong) !important;
     border: 1px solid var(--line) !important;
@@ -777,7 +784,11 @@ button.clear-btn, .clear-btn button {
     border-radius: 12px !important;
     font-weight: 600 !important;
 }
-button.loc-btn:hover, .loc-btn button:hover,
+button.loc-btn:hover, .loc-btn button:hover {
+    border-color: var(--accent) !important;
+    color: var(--ink) !important;
+    background: var(--surface-hover) !important;
+}
 button.clear-btn:hover, .clear-btn button:hover {
     border-color: var(--accent) !important;
     color: var(--ink) !important;

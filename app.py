@@ -255,6 +255,8 @@ with gr.Blocks(
     with gr.Row(elem_classes="main-row"):
         with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
             weather_panel = gr.HTML(render_panel_placeholder("Hava durumu yükleniyor..."))
+            map_panel = gr.HTML(value="", visible=False)
+            show_loc_btn = gr.Button("📍 Konumu Haritada Göster", visible=False, elem_classes="loc-btn")
 
         with gr.Column(scale=5, elem_classes="chat-surface"):
             with gr.Column(visible=True, elem_classes="empty-state") as empty_state:
@@ -276,9 +278,6 @@ with gr.Blocks(
                 show_label=False,
                 avatar_images=(None, None),
             )
-
-            map_panel = gr.HTML(value="", visible=False)
-            show_loc_btn = gr.Button("📍 Konumu Haritada Göster", visible=False, elem_classes="loc-btn")
 
             with gr.Row(elem_classes="chat-input-row"):
                 textbox = gr.Textbox(
