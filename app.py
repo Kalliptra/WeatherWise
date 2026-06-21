@@ -780,4 +780,7 @@ if IS_HF_SPACE:
 
 if __name__ == "__main__":
     demo.queue(max_size=20)
-    demo.launch(show_error=True, show_api=False, server_name="127.0.0.1")
+    # HF Spaces'in reverse-proxy'si konteynere ulaşabilsin diye 0.0.0.0'a bağlan;
+    # yerelde 127.0.0.1 kalsın.
+    server_name = "0.0.0.0" if IS_HF_SPACE else "127.0.0.1"
+    demo.launch(show_error=True, show_api=False, server_name=server_name)
