@@ -600,15 +600,15 @@ gradio-app, .gradio-container,
     border-color: transparent !important;
 }
 .gradio-container {
-    max-width: 1140px !important;
+    max-width: 100% !important;
     margin: 0 auto !important;
-    padding-top: 18px !important;
+    padding: 18px 32px !important;
     color: var(--ink) !important;
 }
 .gradio-container .prose,
 .gradio-container .prose * { color: var(--ink) !important; }
 footer { display: none !important; }
-.main-row { gap: 18px !important; align-items: flex-start !important; }
+.main-row { gap: 18px !important; align-items: flex-start !important; width: 100% !important; }
 
 /* Tema geçişinde bileşen renkleri de yumuşasın */
 .wx-panel, .chat-surface, .chat-area .flex-wrap.user, .chat-area .flex-wrap.bot,
@@ -656,7 +656,7 @@ footer { display: none !important; }
 }
 
 /* ---- Hava paneli ---- */
-.panel-col { position: sticky; top: 14px; align-self: flex-start; }
+.panel-col { position: sticky; top: 14px; align-self: flex-start; min-width: 280px; }
 .wx-panel {
     position: relative;
     overflow: hidden;
@@ -833,7 +833,14 @@ footer { display: none !important; }
 .chat-area button svg { color: inherit !important; opacity: 0.85; }
 
 /* ---- Giriş alanı ---- */
-.chat-input-row { margin-top: 12px !important; gap: 8px !important; }
+.chat-input-row {
+    margin-top: 12px !important;
+    gap: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+}
 textarea, input[type="text"] {
     background: var(--surface-strong) !important;
     border: 1px solid var(--line) !important;
@@ -850,6 +857,12 @@ textarea:focus, input:focus {
     border-color: var(--accent) !important;
     box-shadow: 0 0 0 4px var(--glow) !important;
     outline: none !important;
+}
+.chat-input-row textarea {
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
+    resize: none !important;
 }
 
 button.primary {
@@ -912,6 +925,7 @@ button.clear-btn:hover, .clear-btn button:hover {
     position: sticky;
     top: 14px;
     align-self: flex-start;
+    min-width: 200px;
     background: var(--surface) !important;
     border: 1px solid var(--line);
     border-radius: 18px;

@@ -613,6 +613,7 @@ with gr.Blocks(
                     scale=9,
                     container=False,
                     lines=1,
+                    max_lines=1,
                     show_label=False,
                 )
                 send_btn = gr.Button("Gönder ↗", variant="primary", scale=1)
