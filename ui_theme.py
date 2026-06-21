@@ -608,7 +608,11 @@ gradio-app, .gradio-container,
 .gradio-container .prose,
 .gradio-container .prose * { color: var(--ink) !important; }
 footer { display: none !important; }
+/* Flex row içindeki sütunlar yalnızca scale oranına göre yer alır.
+   min-width:auto (varsayılan) içeriğin sütun genişliğini zorla değiştirmesine izin verir;
+   min-width:0 ile streaming/yükleme sırasında genişlik sabit kalır. */
 .main-row { gap: 18px !important; align-items: flex-start !important; }
+.main-row > div { min-width: 0 !important; }
 
 /* Tema geçişinde bileşen renkleri de yumuşasın */
 .wx-panel, .chat-surface, .chat-area .flex-wrap.user, .chat-area .flex-wrap.bot,
@@ -739,43 +743,75 @@ footer { display: none !important; }
     border-radius: 22px !important;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45) !important;
     padding: 18px !important;
+    /* Genişlik sabitliği: flex içinde içerik ne olursa olsun sütun genişliği değişmez */
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+/* Chat yüzeyinin tüm doğrudan Gradio sarmalayıcıları da genişliği doldursun */
+.chat-surface > .wrap,
+.chat-surface > div:not([class*="session"]) {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
 }
 .chat-surface label, .chat-surface span, .chat-surface p { color: var(--ink) !important; }
+/* Gradio'nun streaming/loading overlay'leri genişlik reflow yaratmasın */
+.chat-surface .generating,
+.chat-surface .progress-bar,
+.chat-surface [data-testid="chatbot"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
 
-/* Kaydırma kabı, satırlar ve Gradio'nun varsayılan opak zeminleri şeffaf */
+/* Kaydırma kabı, satırlar ve Gradio'nun varsayılan opak zeminleri şeffaf.
+   width:100% + min-width:0 → streaming sırasında chatbot genişliği sabit kalır. */
 .chat-area, .chat-area .wrapper, .chat-area .bubble-wrap,
 .chat-area .message-wrap, .chat-area .message-row {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
 }
 /* Yeni içerik eklendiğinde scroll pozisyonu atlamaması için scroll-anchor */
 .chat-area .bubble-wrap, .chat-area .wrap, .chat-area > div {
     overflow-anchor: auto;
 }
-/* Scroll container içindeki son element anchor görevi görür */
 .chat-area .bubble-wrap > div:last-child,
 .chat-area .wrap > div:last-child {
     overflow-anchor: auto;
 }
 
-/* Asıl balon = .flex-wrap (TEK görünür katman) */
-.chat-area .flex-wrap { padding: 11px 15px !important; }
+/* ---- Mesaj balonları ---- */
+/* max-width + overflow-wrap: balonlar chat alanının dışına taşmaz */
+.chat-area .flex-wrap {
+    padding: 11px 15px !important;
+    min-width: 0 !important;
+    max-width: 88% !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    box-sizing: border-box !important;
+}
 .chat-area .flex-wrap.user {
     background: linear-gradient(150deg, var(--accent), var(--accent-strong)) !important;
     border: none !important;
     border-radius: 16px 16px 4px 16px !important;
     box-shadow: 0 10px 26px var(--glow) !important;
     font-weight: 600 !important;
+    max-width: 78% !important; /* kullanıcı balonu daha kısa → okunabilir */
 }
 .chat-area .flex-wrap.bot {
     background: var(--surface-strong) !important;
     border: 1px solid var(--line) !important;
     border-radius: 16px 16px 16px 4px !important;
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.30) !important;
+    max-width: 92% !important; /* bot balonu uzun içerik taşıyabilir */
 }
 
-/* İç sarmalayıcılar (message + tıklanabilir button) tüm kutu stillerinden arındırılır */
+/* İç sarmalayıcılar: alanı dolduruyor ama taşmıyor */
 .chat-area .message,
 .chat-area .flex-wrap button {
     background: transparent !important;
@@ -784,6 +820,16 @@ footer { display: none !important; }
     box-shadow: none !important;
     padding: 0 !important;
     cursor: default !important;
+    min-width: 0 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+}
+/* Prose içeriği: metin, liste, başlıklar taşmıyor */
+.chat-area .flex-wrap .prose {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
 }
 .chat-area .flex-wrap .prose p:first-child,
 .chat-area .flex-wrap .prose ul:first-child,
@@ -791,6 +837,32 @@ footer { display: none !important; }
 .chat-area .flex-wrap .prose p:last-child,
 .chat-area .flex-wrap .prose ul:last-child,
 .chat-area .flex-wrap .prose ol:last-child { margin-bottom: 0 !important; }
+
+/* Tablo: yatay içerik varsa balon içinde scroll edilir, dışa taşmaz */
+.chat-area .flex-wrap table {
+    display: block !important;
+    width: max-content !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    border-collapse: collapse !important;
+}
+/* Pre/code blokları: uzun satırlar yatay scroll, dışa taşmaz */
+.chat-area .flex-wrap pre {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    white-space: pre !important;
+    word-break: normal !important;
+    box-sizing: border-box !important;
+}
+/* Resimler: balon genişliğini aşamaz */
+.chat-area .flex-wrap img {
+    max-width: 100% !important;
+    height: auto !important;
+}
+/* Uzun URL'ler kırılsın */
+.chat-area .flex-wrap a {
+    word-break: break-all !important;
+}
 
 /* Metin renkleri */
 .chat-area .flex-wrap.user,
@@ -811,6 +883,7 @@ footer { display: none !important; }
     border-radius: 6px !important;
     padding: 1px 6px !important;
     font-size: 0.9em;
+    word-break: break-word !important;
 }
 .chat-area .flex-wrap.bot hr {
     border: none !important;
@@ -1180,6 +1253,7 @@ button.suggestion-btn:hover {
 /* ---- Mobil ---- */
 @media (max-width: 860px) {
     .main-row { flex-direction: column !important; }
+    .main-row > div { min-width: 0 !important; width: 100% !important; }
     .panel-col { position: static; width: 100% !important; }
     .session-sidebar { position: static; width: 100% !important; max-height: 220px; }
     .wx-panel { padding: 22px 18px; }
