@@ -633,3 +633,42 @@ def generate_next_suggestion(history: list[dict]) -> tuple[str, str]:
         return hint, suggestion
     except Exception:
         return "", ""
+
+
+def _fallback_title(text: str) -> str:
+    """LLM başlık üretemezse ilk mesajdan kısa bir başlık türetir."""
+    clean = " ".join((text or "").split())
+    if not clean:
+        return "Yeni Sohbet"
+    return clean[:40].rstrip() + ("…" if len(clean) > 40 else "")
+
+
+def generate_session_title(first_user_msg: str, lang: str = "tr") -> str:
+    """İlk kullanıcı mesajından 3-5 kelimelik kısa bir session başlığı üretir.
+
+    Hata durumunda mesajın ilk ~40 karakterine düşer.
+    """
+    msg = (first_user_msg or "").strip()
+    if not msg:
+        return "Yeni Sohbet"
+    try:
+        if lang == "tr":
+            sys_content = (
+                "Aşağıdaki kullanıcı mesajı için 3-5 kelimelik kısa, açıklayıcı bir "
+                "başlık üret (tırnak, noktalama ve emoji olmadan). Sadece başlığı yaz."
+            )
+        else:
+            sys_content = (
+                "Generate a short 3-5 word descriptive title for the user message below "
+                "(no quotes, punctuation, or emoji). Output only the title."
+            )
+        raw = evaluator_llm.invoke(
+            [SystemMessage(content=sys_content), HumanMessage(content=msg[:400])],
+            config={"max_tokens": 20},
+        ).content
+        title = " ".join((raw or "").split()).strip().strip('"').strip("'")
+        if not title:
+            return _fallback_title(msg)
+        return title[:60]
+    except Exception:
+        return _fallback_title(msg)
