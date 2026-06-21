@@ -749,6 +749,15 @@ footer { display: none !important; }
     border: none !important;
     box-shadow: none !important;
 }
+/* Yeni içerik eklendiğinde scroll pozisyonu atlamaması için scroll-anchor */
+.chat-area .bubble-wrap, .chat-area .wrap, .chat-area > div {
+    overflow-anchor: auto;
+}
+/* Scroll container içindeki son element anchor görevi görür */
+.chat-area .bubble-wrap > div:last-child,
+.chat-area .wrap > div:last-child {
+    overflow-anchor: auto;
+}
 
 /* Asıl balon = .flex-wrap (TEK görünür katman) */
 .chat-area .flex-wrap { padding: 11px 15px !important; }
@@ -1004,8 +1013,9 @@ button.session-icon:hover, .session-icon button:hover {
 }
 
 /* ---- Boş durum (karşılama + öneri kartları) ---- */
+/* min-height chatbot height (520px) ile eşleşmeli → geçişte layout kayması olmaz */
 .empty-state {
-    min-height: 430px;
+    min-height: 520px;
     justify-content: center !important;
     padding: 12px 8px !important;
     background: transparent !important;

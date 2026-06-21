@@ -148,32 +148,45 @@ FORCE_DARK_JS = """
         chatInput.focus();
     });
 
-    function scrollChatToBottom() {
-        // Son mesajı bul ve görünür yap
-        var messages = document.querySelectorAll('.chat-area .message-wrap, .chat-area [class*="message"], .chat-area .bubble-wrap > div');
-        if (messages.length > 0) {
-            messages[messages.length - 1].scrollIntoView({ block: 'end', behavior: 'smooth' });
-        }
-        // Ek güvence: scroll yapabilecek tüm üst container'ları da kayan yap
-        var selectors = [
-            '.chat-area .bubble-wrap',
-            '.chat-area .wrap',
-            '.chat-area > div:first-child',
-            '.chat-area',
-        ];
-        for (var i = 0; i < selectors.length; i++) {
-            var el = document.querySelector(selectors[i]);
-            if (el && el.scrollHeight > el.clientHeight) {
-                el.scrollTop = el.scrollHeight;
-                break;
+    // Chat alanı içindeki scroll edilebilir container'ı bul.
+    // scrollIntoView KULLANMA — tüm sayfayı kaydırır ve "kayma" efekti yaratır.
+    function findScrollTarget() {
+        var chatArea = document.querySelector('.chat-area');
+        if (!chatArea) return null;
+
+        function walk(node) {
+            if (!node || !node.children) return null;
+            var cs = window.getComputedStyle(node);
+            var oy = cs.overflowY;
+            if ((oy === 'scroll' || oy === 'auto') && node.scrollHeight > node.clientHeight + 4) {
+                return node;
             }
+            for (var i = 0; i < node.children.length; i++) {
+                var r = walk(node.children[i]);
+                if (r) return r;
+            }
+            return null;
         }
+
+        return walk(chatArea) || chatArea;
     }
 
-    var _scrollTimer = null;
+    function scrollChatToBottom() {
+        var target = findScrollTarget();
+        if (target) target.scrollTop = target.scrollHeight;
+    }
+
+    // requestAnimationFrame ile bir frame sonraya ertele → layout hesaplandıktan sonra çalışır.
+    // setTimeout yerine rAF kullanmak, scroll'un içerik yerleştikten hemen sonra tetiklenmesini sağlar.
+    var _rafPending = false;
     var chatObserver = new MutationObserver(function() {
-        if (_scrollTimer) clearTimeout(_scrollTimer);
-        _scrollTimer = setTimeout(scrollChatToBottom, 50);
+        if (!_rafPending) {
+            _rafPending = true;
+            requestAnimationFrame(function() {
+                scrollChatToBottom();
+                _rafPending = false;
+            });
+        }
     });
 
     function attachChatObserver() {
