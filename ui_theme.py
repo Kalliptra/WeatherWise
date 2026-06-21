@@ -284,7 +284,7 @@ venues.forEach(function(v) {{
     srcdoc = _html.escape(map_doc, quote=True)
     return (
         f'<iframe srcdoc="{srcdoc}" '
-        'style="width:100%;height:280px;border:1px solid rgba(255,255,255,0.08);'
+        'style="width:100%;height:340px;border:1px solid rgba(255,255,255,0.08);'
         'border-radius:18px;" loading="lazy"></iframe>'
     )
 
@@ -600,7 +600,7 @@ gradio-app, .gradio-container,
     border-color: transparent !important;
 }
 .gradio-container {
-    max-width: 1140px !important;
+    max-width: 1480px !important;
     margin: 0 auto !important;
     padding-top: 18px !important;
     color: var(--ink) !important;
@@ -660,7 +660,15 @@ footer { display: none !important; }
 }
 
 /* ---- Hava paneli ---- */
-.panel-col { position: sticky; top: 14px; align-self: flex-start; }
+.panel-col {
+    position: sticky;
+    top: 14px;
+    align-self: flex-start;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+.panel-col::-webkit-scrollbar { display: none; }
 .wx-panel {
     position: relative;
     overflow: hidden;
@@ -757,17 +765,57 @@ footer { display: none !important; }
 }
 .chat-surface label, .chat-surface span, .chat-surface p { color: var(--ink) !important; }
 /* Gradio'nun streaming/loading overlay'leri genişlik reflow yaratmasın */
-.chat-surface .generating,
-.chat-surface .progress-bar,
 .chat-surface [data-testid="chatbot"] {
     width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
+    /* Streaming sırasında dış kap yüksekliği değişmesin */
+    height: 520px !important;
+    max-height: 520px !important;
+    overflow: hidden !important;
+}
+/* KÖK NEDEN: Gradio, yanıt akarken mesaj listesinin sonuna kendi
+   "pending" (yanıp sönen üç nokta) göstergesini ekler — bunun height'i
+   var(--size-16). İçerik tabanlı chatbot yüksekliği bu yüzden cevap
+   sırasında büyüyüp bitince küçülüyor. Kendi TYPING_INDICATOR'ımız
+   olduğundan Gradio'nun bu elemanını tamamen kaldırıyoruz. */
+.chat-area .pending,
+.chat-surface .pending,
+.chat-area .dot-flashing,
+.chat-surface .dot-flashing {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+}
+/* .generating / progress-bar de dış kabı etkilemesin */
+.chat-surface .generating,
+.chat-surface .progress-bar,
+.chat-area .generating,
+.chat-area .progress-bar,
+.chat-area ~ .progress-bar {
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
 }
 
-/* Kaydırma kabı, satırlar ve Gradio'nun varsayılan opak zeminleri şeffaf.
-   width:100% + min-width:0 → streaming sırasında chatbot genişliği sabit kalır. */
-.chat-area, .chat-area .wrapper, .chat-area .bubble-wrap,
+/* Chatbot dış kap: sabit yükseklik — içindeki hiçbir şey bunu büyütemez.
+   contain:size → browser bu elemanın boyutunu children'dan bağımsız hesaplar,
+   streaming DOM re-render'larında layout propagation olmaz. */
+.chat-area {
+    height: 520px !important;
+    min-height: 520px !important;
+    max-height: 520px !important;
+    overflow: hidden !important;
+    contain: size layout !important;
+    flex-shrink: 0 !important;
+}
+/* Kaydırma kabı, satırlar ve Gradio'nun varsayılan opak zeminleri şeffaf. */
+.chat-area .wrapper, .chat-area .bubble-wrap,
 .chat-area .message-wrap, .chat-area .message-row {
     background: transparent !important;
     border: none !important;
@@ -775,6 +823,21 @@ footer { display: none !important; }
     width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
+}
+/* İç scroll alanı: tam yüksekliği doldurur ve mesajları içinde scroll eder.
+   .wrapper ve .panel-wrap dahil — bunlar Gradio'da içerik tabanlı büyüyebilir,
+   100%'e sabitleyince yalnızca içeride scroll olur, dış kap asla değişmez. */
+.chat-area .wrapper,
+.chat-area .panel-wrap,
+.chat-area .wrap,
+.chat-area .bubble-wrap,
+.chat-area > div > div {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    flex-grow: 0 !important;
 }
 /* Yeni içerik eklendiğinde scroll pozisyonu atlamaması için scroll-anchor */
 .chat-area .bubble-wrap, .chat-area .wrap, .chat-area > div {
@@ -1248,6 +1311,34 @@ button.suggestion-btn:hover {
 @keyframes typing-bounce {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
     30% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* ---- Masaüstü (861px+) — sidebar ve panel sabit genişlik, chat alanı kalanı alır ---- */
+@media (min-width: 861px) {
+    .session-sidebar {
+        flex: 0 0 240px !important;
+        min-width: 240px !important;
+        max-width: 240px !important;
+    }
+    .panel-col {
+        flex: 0 0 320px !important;
+        min-width: 320px !important;
+        max-width: 320px !important;
+    }
+}
+
+/* ---- Büyük monitör (1400px+) — panel biraz daha geniş ---- */
+@media (min-width: 1400px) {
+    .session-sidebar {
+        flex: 0 0 260px !important;
+        min-width: 260px !important;
+        max-width: 260px !important;
+    }
+    .panel-col {
+        flex: 0 0 360px !important;
+        min-width: 360px !important;
+        max-width: 360px !important;
+    }
 }
 
 /* ---- Mobil ---- */

@@ -198,6 +198,73 @@ FORCE_DARK_JS = """
         }
     }
     attachChatObserver();
+
+    // Chatbot yüksekliği streaming sırasında değişmesin.
+    // Gradio type="messages" her update'te DOM'u re-render eder; inline style sıfırlanabilir.
+    // ResizeObserver ile height değişikliği anında yakalanır ve geri alınır.
+    // MutationObserver ile parent bloka eklenen status/generating elemanları anında gizlenir.
+    function lockChatHeight() {
+        var chatEl = document.querySelector('.chat-area');
+        if (!chatEl) { setTimeout(lockChatHeight, 400); return; }
+
+        var TARGET_H = '520px';
+
+        function enforceHeight() {
+            chatEl.style.setProperty('height', TARGET_H, 'important');
+            chatEl.style.setProperty('min-height', TARGET_H, 'important');
+            chatEl.style.setProperty('max-height', TARGET_H, 'important');
+            chatEl.style.setProperty('overflow', 'hidden', 'important');
+            chatEl.style.setProperty('flex-shrink', '0', 'important');
+        }
+
+        // Gradio status/generating/pending elemanlarını yüksekliksiz yap
+        var STATUS_RE = /status|pending|progress|generating|loading/i;
+        function collapseStatusEl(el) {
+            if (!el || el === chatEl) return;
+            var cls = el.className || '';
+            if (STATUS_RE.test(cls)) {
+                el.style.setProperty('height', '0', 'important');
+                el.style.setProperty('min-height', '0', 'important');
+                el.style.setProperty('max-height', '0', 'important');
+                el.style.setProperty('overflow', 'hidden', 'important');
+                el.style.setProperty('padding', '0', 'important');
+                el.style.setProperty('margin', '0', 'important');
+                el.style.setProperty('visibility', 'hidden', 'important');
+            }
+        }
+
+        enforceHeight();
+
+        // 1) ResizeObserver: .chat-area kendi boyutu değişirse anında düzelt
+        var ro = new ResizeObserver(function(entries) {
+            var entry = entries[0];
+            if (entry && Math.round(entry.contentRect.height) !== 520) {
+                enforceHeight();
+            }
+        });
+        ro.observe(chatEl);
+
+        // 2) MutationObserver: parent block'a eklenen yeni elemanları (status bar vb.) gizle
+        var parentBlock = chatEl.parentElement;
+        if (parentBlock) {
+            var mo = new MutationObserver(function(mutations) {
+                mutations.forEach(function(m) {
+                    m.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1) collapseStatusEl(node);
+                    });
+                    // inline style değişikliği → yüksekliği geri al
+                    if (m.type === 'attributes' && m.target === chatEl) {
+                        enforceHeight();
+                    }
+                });
+            });
+            mo.observe(parentBlock, { childList: true, subtree: false });
+            mo.observe(chatEl, { attributes: true, attributeFilter: ['style'] });
+            // Zaten var olan status elemanlarını da temizle
+            Array.prototype.forEach.call(parentBlock.children, collapseStatusEl);
+        }
+    }
+    lockChatHeight();
 }
 """
 
@@ -538,7 +605,7 @@ with gr.Blocks(
     sidebar_visible = gr.State(True)
 
     with gr.Row(elem_classes="main-row"):
-        with gr.Column(scale=1, min_width=200, elem_classes="session-sidebar", visible=True) as sidebar_col:
+        with gr.Column(scale=1, min_width=240, elem_classes="session-sidebar", visible=True) as sidebar_col:
             new_chat_btn = gr.Button("➕ Yeni Sohbet", elem_classes="new-chat-btn")
 
             @gr.render(inputs=[sessions_state, session_id_state])
@@ -578,7 +645,7 @@ with gr.Blocks(
                         api_name=False,
                     )
 
-        with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
+        with gr.Column(scale=2, min_width=300, elem_classes="panel-col"):
             weather_panel = gr.HTML(render_panel_placeholder("Hava durumu yükleniyor..."))
             forecast_plot = gr.Plot(visible=False, elem_classes="forecast-plot", show_label=False)
             map_panel = gr.HTML(value="", visible=False)
