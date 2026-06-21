@@ -1054,6 +1054,21 @@ button.session-icon:hover, .session-icon button:hover {
     max-width: 460px;
     margin: 0 auto;
 }
+.empty-state .greeting .onboarding-question {
+    margin-top: 18px;
+    padding: 16px 20px;
+    background: var(--surface-strong);
+    border-radius: 14px;
+    border-left: 3px solid var(--accent);
+    text-align: left;
+    max-width: 460px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.empty-state .greeting .onboarding-question p {
+    margin: 4px auto;
+    color: var(--ink);
+}
 button.suggestion-btn {
     background: var(--surface-strong) !important;
     border: 1px solid var(--line) !important;
@@ -1168,6 +1183,18 @@ button.suggestion-btn:hover {
 .footer-note p,
 .footer-note strong { color: var(--ink-faint) !important; font-weight: 600 !important; }
 .footer-note hr { display: none; }
+
+/* ---- Suggestion store: DOM'da olsun ama görünmesin ---- */
+.skywise-offscreen {
+    position: absolute !important;
+    left: -9999px !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    tab-index: -1 !important;
+}
 
 /* ---- "Yazıyor..." üç nokta animasyonu ---- */
 .typing-indicator {

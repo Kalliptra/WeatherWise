@@ -134,6 +134,31 @@ def format_memory_block(memory: dict, lang: str = "tr") -> str:
     return "\n".join(parts)
 
 
+def get_activity_preferences(username: Optional[str]) -> list[str]:
+    """Kullanıcının kayıtlı aktivite tercihlerini döner. username yoksa boş liste."""
+    return load_memory(username).get("preferences", {}).get("liked", [])
+
+
+def update_activity_preferences(
+    username: Optional[str], categories: list[str], replace: bool = False
+) -> None:
+    """Aktivite tercihlerini doğrudan günceller (LLM çıkarımı gereksiz).
+
+    replace=True ise mevcut listeyi siler ve yenisiyle değiştirir.
+    """
+    if not username:
+        return
+    memory = load_memory(username)
+    prefs = memory.setdefault("preferences", {"liked": [], "disliked": [], "notes": ""})
+    if replace:
+        prefs["liked"] = [c for c in categories if c]
+    else:
+        for cat in categories:
+            if cat and cat not in prefs["liked"]:
+                prefs["liked"].append(cat)
+    save_memory(username, memory)
+
+
 def extract_and_update(
     messages: list[dict],
     city: Optional[str],

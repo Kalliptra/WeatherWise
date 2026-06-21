@@ -20,6 +20,7 @@ _gcu.get_type = _safe_get_type
 _gcu._json_schema_to_python_type = _safe_jspt
 
 import os  # noqa: E402
+import threading  # noqa: E402
 
 import gradio as gr  # noqa: E402
 
@@ -33,6 +34,7 @@ from chat import (  # noqa: E402
     get_current_language,
     set_user_location,
 )
+from tools.memory import get_activity_preferences, update_activity_preferences  # noqa: E402
 from ui_theme import (  # noqa: E402
     CUSTOM_CSS,
     render_locations_map,
@@ -60,6 +62,10 @@ from tools.sessions import (  # noqa: E402
 
 DEFAULT_CITY = os.getenv("DEFAULT_CITY", "Istanbul")
 IS_HF_SPACE = bool(os.getenv("SPACE_ID"))
+
+# Aktif bir respond_from_history generator'unu işaretçi flag'i ile durdurur.
+# set() → generator bir sonraki yield öncesi temiz şekilde durur (Error göstermez).
+_abort = threading.Event()
 
 # HF Spaces'te OAuth profile annotasyonunu dinamik ekle.
 # Yerelde session middleware olmadığından annotasyon hata verir; bu yüzden koşullu.
@@ -89,18 +95,42 @@ ANON_ID_JS = """
 """
 
 ORNEK_SORULAR = [
-    "İstanbul'da bugün bisiklet sürmek için hava uygun mu?",
-    "Ankara'da yağmurlu bir günde yapılacak iç mekân aktiviteleri",
-    "Is it a good day for a picnic in Paris today?",
-    "Best outdoor activity in London given today's weather?",
+    "🏃 Spor & Fitness",
+    "🌿 Doğa & Yürüyüş",
+    "🎨 Kültür & Müze",
+    "🍽️ Yemek & Kafe",
 ]
+
+# Kullanıcının kategori butonlarından seçtiği metni aktivite tercihine eşleyen sözlük.
+# Tercih kaydı için kullanılır — key: buton etiketi, value: kayıt edilecek kategoriler.
+CATEGORY_PREFS: dict[str, list[str]] = {
+    "🏃 Spor & Fitness": ["spor", "fitness"],
+    "🌿 Doğa & Yürüyüş": ["doğa", "yürüyüş"],
+    "🎨 Kültür & Müze": ["kültür", "müze"],
+    "🍽️ Yemek & Kafe": ["yemek", "kafe"],
+    "🏃 Sports & Fitness": ["sports", "fitness"],
+    "🌿 Nature & Hiking": ["nature", "hiking"],
+    "🎨 Culture & Museum": ["culture", "museum"],
+    "🍽️ Food & Café": ["food", "café"],
+}
 
 KARSILAMA_HTML = """
 <div class="greeting">
-    <div class="wave">🌙</div>
+    <div class="wave">🌤️</div>
     <h2>Merhaba! Ben SkyWise</h2>
-    <p>Hava durumuna göre aktivite öneren asistanın. Bir şehir ve nasıl bir
-    aktivite aradığını yaz; senin için anlık öneriler ve harita hazırlayayım.</p>
+    <p>Bulunduğun şehrin hava durumuna göre sana en uygun aktiviteleri öneririm.
+    Aşağıdan kategori seç ya da istediğini yaz — hemen öneriler hazırlayayım.</p>
+</div>
+"""
+
+ONBOARDING_HTML = """
+<div class="greeting">
+    <div class="wave">🌤️</div>
+    <h2>Merhaba! Ben SkyWise</h2>
+    <div class="onboarding-question">
+        <p><strong>Hangi tür aktiviteleri seversin?</strong></p>
+        <p>Aşağıdan bir kategori seç — bulunduğun yerin havasına göre hemen öneriler hazırlayayım.</p>
+    </div>
 </div>
 """
 
@@ -139,11 +169,15 @@ FORCE_DARK_JS = """
     document.addEventListener('keydown', function(e) {
         if (e.key !== 'Tab') return;
         var sugBox = document.querySelector('#skywise-suggestion textarea, #skywise-suggestion input');
-        if (!sugBox || !sugBox.value) return;
+        if (!sugBox) return;
+        var val = sugBox.value || sugBox.textContent || '';
+        if (!val.trim()) return;
         var chatInput = document.querySelector('.chat-input-row textarea');
         if (!chatInput) return;
         e.preventDefault();
-        chatInput.value = sugBox.value;
+        // Svelte/React controlled input için native setter kullan
+        var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+        nativeSetter.call(chatInput, val);
         chatInput.dispatchEvent(new Event('input', { bubbles: true }));
         chatInput.focus();
     });
@@ -254,12 +288,20 @@ def respond_from_history(history, queued, session_id, sessions, username, anon_i
     """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel,
     show_loc_btn, location_state, suggestion_box, queued_state, queued_display,
     session_id_state, sessions_state)."""
+    _abort.clear()
     if not queued:
         return
 
     user_message = queued[0]
     remaining = list(queued[1:])
     qd = render_queued_display(remaining)
+
+    # Kullanıcı bir kategori butonu seçtiyse tercihi Redis'e kaydet
+    if username and user_message in CATEGORY_PREFS:
+        try:
+            update_activity_preferences(username, CATEGORY_PREFS[user_message])
+        except Exception:
+            pass
 
     if not session_id:
         session_id = new_session_id()
@@ -280,6 +322,8 @@ def respond_from_history(history, queued, session_id, sessions, username, anon_i
 
     try:
         for partial in chat_skywise(convo_for_agent, username=username or None):
+            if _abort.is_set():
+                return
             history[-1]["content"] = partial if partial else TYPING_INDICATOR
             weather = get_last_weather()
             venues = get_last_venues()
@@ -344,6 +388,7 @@ def respond_from_history(history, queued, session_id, sessions, username, anon_i
 
 def clear_chat():
     """'Yeni Sohbet' — sohbeti ve panelleri temizler, aktif session id'yi sıfırlar."""
+    _abort.set()
     clear_last_venues()
     clear_last_location()
     clear_last_forecast()
@@ -465,6 +510,56 @@ def show_location_on_map(location_names):
     return gr.update(value=map_html, visible=True), gr.update(visible=False)
 
 
+def check_and_show_onboarding(username: str, anon_id: str):
+    """Sayfa yüklenince çalışır. Giriş yapan yeni kullanıcıya onboarding ekranı gösterir.
+    Karşılama HTML'i günceller; butonlar kategori seçeneklerine dönüşür.
+    Anonim ve tercih kayıtlı kullanıcılar için normal görünüm korunur.
+    Dönüş: (greeting_html, sug1, sug2, sug3, sug4)
+    """
+    noop = (gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
+    if not username:
+        return noop
+    prefs = get_activity_preferences(username)
+    if prefs:
+        return noop
+    cats = ORNEK_SORULAR
+    return (
+        gr.update(value=ONBOARDING_HTML),
+        gr.update(value=cats[0]),
+        gr.update(value=cats[1]),
+        gr.update(value=cats[2]),
+        gr.update(value=cats[3]),
+    )
+
+
+def trigger_preference_update(username: str):
+    """'Tercihlerimi Güncelle' — sohbeti temizler ve onboarding ekranını gösterir.
+    Dönüş: NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS (15 değer)
+    """
+    _abort.set()
+    clear_last_venues()
+    clear_last_location()
+    clear_last_forecast()
+    cats = ORNEK_SORULAR
+    return (
+        gr.update(value=[], visible=False),   # chatbot
+        gr.update(visible=True),               # empty_state
+        "",                                    # textbox
+        gr.update(value="", visible=False),    # map_panel
+        gr.update(visible=False),              # show_loc_btn
+        "",                                    # location_state
+        [],                                    # queued_state
+        "",                                    # queued_display
+        "",                                    # session_id_state
+        gr.update(visible=False),              # forecast_plot
+        gr.update(value=ONBOARDING_HTML),      # greeting_html
+        gr.update(value=cats[0]),              # sug1
+        gr.update(value=cats[1]),              # sug2
+        gr.update(value=cats[2]),              # sug3
+        gr.update(value=cats[3]),              # sug4
+    )
+
+
 def load_default_city():
     try:
         weather = get_weather(DEFAULT_CITY)
@@ -540,6 +635,7 @@ with gr.Blocks(
     with gr.Row(elem_classes="main-row"):
         with gr.Column(scale=1, min_width=200, elem_classes="session-sidebar", visible=True) as sidebar_col:
             new_chat_btn = gr.Button("➕ Yeni Sohbet", elem_classes="new-chat-btn")
+            pref_update_btn = gr.Button("⚙️ Tercihlerimi Güncelle", elem_classes="new-chat-btn", size="sm")
 
             @gr.render(inputs=[sessions_state, session_id_state])
             def render_sessions(sessions, active_id):
@@ -586,7 +682,7 @@ with gr.Blocks(
 
         with gr.Column(scale=5, elem_classes="chat-surface"):
             with gr.Column(visible=True, elem_classes="empty-state") as empty_state:
-                gr.HTML(KARSILAMA_HTML)
+                greeting_html = gr.HTML(KARSILAMA_HTML)
                 with gr.Row():
                     sug1 = gr.Button(ORNEK_SORULAR[0], elem_classes="suggestion-btn")
                     sug2 = gr.Button(ORNEK_SORULAR[1], elem_classes="suggestion-btn")
@@ -618,9 +714,6 @@ with gr.Blocks(
                 )
                 send_btn = gr.Button("Gönder ↗", variant="primary", scale=1)
 
-            with gr.Row():
-                clear_btn = gr.Button("🗑 Sohbeti Temizle", size="sm", elem_classes="clear-btn")
-
     gr.Markdown(
         """
         ---
@@ -631,7 +724,13 @@ with gr.Blocks(
 
     theme_state = gr.Textbox(visible=False, elem_id="theme-state")
     geo_coords = gr.Textbox(visible=False, elem_id="geo-coords")
-    suggestion_box = gr.Textbox(visible=False, elem_id="skywise-suggestion", interactive=False)
+    suggestion_box = gr.Textbox(
+        elem_id="skywise-suggestion",
+        elem_classes="skywise-offscreen",
+        interactive=True,
+        container=False,
+        show_label=False,
+    )
 
     RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display, session_id_state, sessions_state]
     RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, username_state, anon_id_box]
@@ -646,7 +745,6 @@ with gr.Blocks(
         (sug.click(pre_submit, [sug, queued_state], PRE_OUTPUTS, api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, api_name=False)
          .then(update_forecast_chart, None, forecast_plot, api_name=False))
-    clear_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, api_name=False)
     new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, api_name=False)
     show_loc_btn.click(show_location_on_map, location_state, [map_panel, show_loc_btn], api_name=False)
 
@@ -661,10 +759,20 @@ with gr.Blocks(
     demo.load(load_default_city, None, [weather_panel, theme_state], api_name=False)
     demo.load(None, None, geo_coords, js=GEO_JS, api_name=False)
     geo_coords.change(apply_geolocation, geo_coords, [weather_panel, theme_state, sug1, sug2, sug3, sug4], api_name=False)
-    # Anon-id (JS) → kullanıcı adı (oauth) → session listesi sırasıyla yüklenir.
+    ONBOARDING_OUTPUTS = [greeting_html, sug1, sug2, sug3, sug4]
+
+    # Anon-id (JS) → kullanıcı adı (oauth) → session listesi → onboarding kontrolü sırasıyla yüklenir.
     (demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
         .then(resolve_username, None, username_state, api_name=False)
-        .then(load_sessions_on_start, [username_state, anon_id_box], sessions_state, api_name=False))
+        .then(load_sessions_on_start, [username_state, anon_id_box], sessions_state, api_name=False)
+        .then(check_and_show_onboarding, [username_state, anon_id_box], ONBOARDING_OUTPUTS, api_name=False))
+
+    pref_update_btn.click(
+        trigger_preference_update,
+        [username_state],
+        NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS,
+        api_name=False,
+    )
 
 
 if IS_HF_SPACE:

@@ -21,7 +21,7 @@ from tools.forecast import (
     summarize_days,
     summarize_timing,
 )
-from tools.memory import extract_and_update, format_memory_block, load_memory
+from tools.memory import extract_and_update, format_memory_block, get_activity_preferences, load_memory
 from tools.uv import get_uv_index
 from tools.venue import find_venues, format_venues_for_llm
 from tools.weather import (
@@ -331,7 +331,20 @@ def _gradio_to_lc_messages(messages: list[dict], username: Optional[str] = None)
 
     base_prompt = get_prompt("chat", _current_language)
     memory_block = format_memory_block(load_memory(username), _current_language)
-    system_content = base_prompt + ("\n\n" + memory_block if memory_block else "")
+
+    # Algılanan konum (geolocation) varsa sistem promptuna ekle
+    location_block = ""
+    if _user_location:
+        if _current_language == "tr":
+            location_block = f"\n\n## Algılanan Konum\nKullanıcının şu anki konumu: {_user_location}"
+        else:
+            location_block = f"\n\n## Detected Location\nUser's current location: {_user_location}"
+
+    system_content = (
+        base_prompt
+        + location_block
+        + ("\n\n" + memory_block if memory_block else "")
+    )
     lc: list = [SystemMessage(content=system_content)]
     for m in messages:
         role = m.get("role")
@@ -546,15 +559,6 @@ def chat_skywise(messages: list[dict], username: Optional[str] = None) -> Iterat
         except Exception:
             final_text = worker_text
 
-        # Itinerary agent: öneri üretilen turlarda günlük plan ekle
-        try:
-            itinerary = _generate_itinerary_for_chat(final_text, new_messages)
-            if itinerary:
-                sep = "\n\n---\n\n"
-                final_text = final_text + sep + itinerary
-        except Exception:
-            pass
-
         # Hafıza güncelleme: arka planda çalıştır, ana akışı bloke etme
         focus_city = _focus_city_from_tools(new_messages) or _user_location
         full_messages = messages + [{"role": "assistant", "content": final_text}]
@@ -599,6 +603,24 @@ def chat_skywise(messages: list[dict], username: Optional[str] = None) -> Iterat
             pass
 
     yield from _stream_chunks(final_text)
+
+
+_ONBOARDING_TR = (
+    "Merhaba! Ben SkyWise 🌤️\n\n"
+    "Bulunduğun şehrin hava durumunu analiz edip sana en uygun aktiviteleri öneririm.\n\n"
+    "**Hangi tür aktiviteleri seversin?** Aşağıdan seçebilir ya da istediğini yazabilirsin."
+)
+
+_ONBOARDING_EN = (
+    "Hi! I'm SkyWise 🌤️\n\n"
+    "I analyze the weather in your city and suggest the best activities for you.\n\n"
+    "**What kind of activities do you enjoy?** Pick one below or just type."
+)
+
+
+def generate_onboarding_message(lang: str = "tr") -> str:
+    """Yeni kullanıcı için AI'nın ilk mesajını döner."""
+    return _ONBOARDING_TR if lang == "tr" else _ONBOARDING_EN
 
 
 _GENEL_ONERILER = [
