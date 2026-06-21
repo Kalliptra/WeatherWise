@@ -11,12 +11,12 @@ from langgraph.graph import END, START, StateGraph
 from core.llms import evaluator_llm, itinerary_llm, planner_llm, react_llm
 from core.prompts import get_prompt
 from core.state import Evaluation, PlannedCall, PlannerOutput, SkyWiseState
+from tools.forecast import get_hourly_forecast, summarize_days, summarize_timing
 from tools.uv import get_uv_index
 from tools.venue import _USE_GOOGLE, find_venues, format_venues_for_llm, geocode_city
 from tools.weather import (
     calculate_comfort_index,
     format_weather_summary,
-    get_forecast,
     get_weather,
 )
 
@@ -120,6 +120,7 @@ def execute_node(state: SkyWiseState) -> dict:
     weather_obj = state.get("weather")
     uv_obj = state.get("uv")
     forecast_str = state.get("forecast")
+    forecast_hourly_obj = state.get("forecast_hourly")
     comfort_str = state.get("comfort")
     weather_summary = state.get("weather_summary")
 
@@ -151,9 +152,11 @@ def execute_node(state: SkyWiseState) -> dict:
                 uv_obj = get_uv_index(city, lang=lang)
                 if weather_obj is not None:
                     weather_summary = format_weather_summary(weather_obj, uv=uv_obj, lang=lang)
-            elif name == "forecast":
+            elif name in ("forecast", "hourly_forecast"):
                 city = args.get("city") or state["city"]
-                forecast_str = get_forecast(city, days=3, lang=lang)
+                days = int(args.get("days", 3))
+                forecast_hourly_obj = get_hourly_forecast(city, days=days, lang=lang)
+                forecast_str = summarize_days(forecast_hourly_obj, lang=lang)
             elif name == "comfort":
                 if weather_obj is not None:
                     temperature = args.get("temperature", weather_obj["temperature"])
@@ -205,6 +208,8 @@ def execute_node(state: SkyWiseState) -> dict:
         out["weather_summary"] = weather_summary
     if forecast_str:
         out["forecast"] = forecast_str
+    if forecast_hourly_obj:
+        out["forecast_hourly"] = forecast_hourly_obj
     if comfort_str:
         out["comfort"] = comfort_str
     if venues:
@@ -313,6 +318,11 @@ def itinerary_node(state: SkyWiseState) -> dict:
         sections.append(state["comfort"])
     if state.get("forecast"):
         sections.append("TAHMİN:\n" + state["forecast"])
+    if state.get("forecast_hourly"):
+        timing = summarize_timing(state["forecast_hourly"], lang=lang)
+        if timing:
+            label = "SAATLİK ZAMANLAMA" if lang == "tr" else "HOURLY TIMING"
+            sections.append(f"{label}:\n{timing}")
 
     weather = state.get("weather") or {}
     mins_to_sunset = weather.get("minutes_to_sunset")

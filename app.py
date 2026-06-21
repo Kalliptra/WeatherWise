@@ -41,6 +41,7 @@ from ui_theme import (  # noqa: E402
     render_weather_panel,
     weather_to_theme,
 )
+from tools.forecast import clear_last_forecast  # noqa: E402
 from tools.weather import (  # noqa: E402
     clear_last_weather,
     get_last_weather,
@@ -88,10 +89,10 @@ ANON_ID_JS = """
 """
 
 ORNEK_SORULAR = [
-    "Bugün İstanbul'da hava nasıl, ne yapabilirim?",
-    "Ankara'da iç mekân aktiviteleri öner",
-    "What can I do in Paris today?",
-    "Recommend a museum in London",
+    "İstanbul'da bugün bisiklet sürmek için hava uygun mu?",
+    "Ankara'da yağmurlu bir günde yapılacak iç mekân aktiviteleri",
+    "Is it a good day for a picnic in Paris today?",
+    "Best outdoor activity in London given today's weather?",
 ]
 
 KARSILAMA_HTML = """
@@ -260,6 +261,7 @@ def respond_from_history(history, queued, session_id, sessions, username, anon_i
     clear_last_weather()
     clear_last_venues()
     clear_last_location()
+    clear_last_forecast()
     panel_sent = False
     map_sent = False
 
@@ -300,7 +302,7 @@ def respond_from_history(history, queued, session_id, sessions, username, anon_i
         new_sessions = _persist_turn(history, session_id, sessions, user_message, username, anon_id)
 
         hint, suggestion = generate_next_suggestion(history)
-        default_placeholder = "Mesajını yaz... (örn: \"Bugün İstanbul'da ne yapsam?\")"
+        default_placeholder = "Etkinlik sor... (örn: \"Bugün koşu için hava uygun mu?\")"
         yield (
             gr.update(),
             gr.update(value="", placeholder=hint if hint else default_placeholder),
@@ -331,6 +333,7 @@ def clear_chat():
     """'Yeni Sohbet' — sohbeti ve panelleri temizler, aktif session id'yi sıfırlar."""
     clear_last_venues()
     clear_last_location()
+    clear_last_forecast()
     return (
         gr.update(value=[], visible=False),
         gr.update(visible=True),
@@ -341,6 +344,7 @@ def clear_chat():
         [],
         "",
         "",
+        gr.update(visible=False),
     )
 
 
@@ -406,6 +410,7 @@ def on_delete_session(sid, active_id, username, anon_id):
     except Exception:
         new_list = []
     if active_id == sid:
+        clear_last_forecast()
         return (
             new_list,
             gr.update(value=[], visible=False),
@@ -453,6 +458,17 @@ def load_default_city():
         return render_weather_panel(weather), weather_to_theme(weather)
     except Exception:
         return render_panel_placeholder("Hava durumu alınamadı."), "clear-day"
+
+
+def update_forecast_chart():
+    """Bu turda çekilen saatlik tahminden Plotly grafiği üretir (yoksa gizler)."""
+    try:
+        fig = render_forecast_chart(get_last_forecast())
+    except Exception:
+        fig = None
+    if fig is None:
+        return gr.update(visible=False)
+    return gr.update(value=fig, visible=True)
 
 
 _GENEL_ONERILER = [
@@ -551,6 +567,7 @@ with gr.Blocks(
 
         with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
             weather_panel = gr.HTML(render_panel_placeholder("Hava durumu yükleniyor..."))
+            forecast_plot = gr.Plot(visible=False, elem_classes="forecast-plot", show_label=False)
             map_panel = gr.HTML(value="", visible=False)
             show_loc_btn = gr.Button("📍 Konumu Haritada Göster", visible=False, elem_classes="loc-btn")
 
@@ -579,7 +596,7 @@ with gr.Blocks(
 
             with gr.Row(elem_classes="chat-input-row"):
                 textbox = gr.Textbox(
-                    placeholder="Mesajını yaz... (örn: \"Bugün İstanbul'da ne yapsam?\")",
+                    placeholder="Etkinlik sor... (örn: \"Bugün koşu için hava uygun mu?\")",
                     scale=9,
                     container=False,
                     lines=1,
@@ -605,14 +622,16 @@ with gr.Blocks(
     RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display, session_id_state, sessions_state]
     RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, username_state, anon_id_box]
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
-    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state]
+    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot]
 
     for trigger in (textbox.submit, send_btn.click):
         (trigger(pre_submit, [textbox, queued_state], PRE_OUTPUTS, api_name=False)
-         .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, api_name=False))
+         .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, api_name=False)
+         .then(update_forecast_chart, None, forecast_plot, api_name=False))
     for sug in (sug1, sug2, sug3, sug4):
         (sug.click(pre_submit, [sug, queued_state], PRE_OUTPUTS, api_name=False)
-         .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, api_name=False))
+         .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, api_name=False)
+         .then(update_forecast_chart, None, forecast_plot, api_name=False))
     clear_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, api_name=False)
     new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, api_name=False)
     show_loc_btn.click(show_location_on_map, location_state, [map_panel, show_loc_btn], api_name=False)

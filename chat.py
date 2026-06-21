@@ -15,13 +15,18 @@ from langgraph.prebuilt import create_react_agent
 from core.llms import evaluator_llm, itinerary_llm, react_llm
 from core.prompts import get_prompt
 from core.graph import _parse_supervisor
+from tools.forecast import (
+    clear_last_forecast,
+    get_hourly_forecast,
+    summarize_days,
+    summarize_timing,
+)
 from tools.memory import extract_and_update, format_memory_block, load_memory
 from tools.uv import get_uv_index
 from tools.venue import find_venues, format_venues_for_llm
 from tools.weather import (
     calculate_comfort_index,
     format_weather_summary,
-    get_forecast,
     get_last_weather,
     get_weather,
 )
@@ -241,10 +246,26 @@ def current_weather_tool(city: str) -> str:
 
 
 @tool
-def forecast_tool(city: str) -> str:
-    """Returns the 3-day weather forecast for the given city."""
+def forecast_tool(city: str, days: int = 3) -> str:
+    """Returns a multi-day, day-by-day weather forecast (min/max temp, condition, rain chance)
+    for the given city. Use this for questions about the next days, tomorrow, or the weekend
+    ('hafta sonu', 'yarın', 'weekend', 'next 3 days')."""
     try:
-        return get_forecast(city, days=3, lang=_current_language)
+        days = max(1, min(int(days), 7))
+        f = get_hourly_forecast(city, days=days, lang=_current_language)
+        return summarize_days(f, lang=_current_language)
+    except (ValueError, ConnectionError) as e:
+        return f"Hata: {e}"
+
+
+@tool
+def hourly_timing_tool(city: str) -> str:
+    """Returns hour-by-hour timing for today: when it will rain (rain windows) and the UV peak.
+    Use this for timing questions ('yağmur ne zaman', 'kaçta yağacak', 'when does it rain',
+    'hour by hour') so activities can be scheduled around rain and high-UV periods."""
+    try:
+        f = get_hourly_forecast(city, days=1, lang=_current_language)
+        return summarize_timing(f, lang=_current_language)
     except (ValueError, ConnectionError) as e:
         return f"Hata: {e}"
 
@@ -286,7 +307,14 @@ _RECOMMENDATION_TOOLS = {"current_weather_tool", "venue_search_tool"}
 
 _chat_worker = create_react_agent(
     react_llm,
-    tools=[current_weather_tool, forecast_tool, comfort_tool, venue_search_tool, uv_tool],
+    tools=[
+        current_weather_tool,
+        forecast_tool,
+        hourly_timing_tool,
+        comfort_tool,
+        venue_search_tool,
+        uv_tool,
+    ],
 )
 
 
@@ -331,7 +359,8 @@ def _turn_produced_recommendation(new_messages: list) -> bool:
 
 
 _CITY_TOOLS = frozenset(
-    {"venue_search_tool", "current_weather_tool", "forecast_tool", "uv_tool"}
+    {"venue_search_tool", "current_weather_tool", "forecast_tool",
+     "hourly_timing_tool", "uv_tool"}
 )
 
 
@@ -428,16 +457,26 @@ def _generate_itinerary_for_chat(
     if not sections:
         return None
 
+    # Çok günlü plan sinyali: bu turda gün-gün tahmin aracı çalıştıysa
+    # itinerary_multiday prompt'unu kullan (gün-gün bloklar).
+    multiday = any(
+        isinstance(m, ToolMessage) and getattr(m, "name", "") == "forecast_tool"
+        for m in new_messages
+    )
+    prompt_name = "itinerary_multiday" if multiday else "itinerary"
+
     if _current_language == "tr":
         sections.append(f"AKTİVİTE ÖNERİLERİ:\n{recommendation}")
-        human = "\n\n".join(sections) + "\n\nLütfen günlük zaman planı oluştur."
+        closing = "\n\nLütfen gün-gün plan oluştur." if multiday else "\n\nLütfen günlük zaman planı oluştur."
+        human = "\n\n".join(sections) + closing
     else:
         sections.append(f"ACTIVITY SUGGESTIONS:\n{recommendation}")
-        human = "\n\n".join(sections) + "\n\nPlease create a day itinerary."
+        closing = "\n\nPlease create a day-by-day plan." if multiday else "\n\nPlease create a day itinerary."
+        human = "\n\n".join(sections) + closing
 
     try:
         raw = itinerary_llm.invoke([
-            SystemMessage(content=get_prompt("itinerary", _current_language)),
+            SystemMessage(content=get_prompt(prompt_name, _current_language)),
             HumanMessage(content=human),
         ]).content
         return raw.strip() or None
@@ -549,33 +588,70 @@ def chat_skywise(messages: list[dict], username: Optional[str] = None) -> Iterat
             except (ValueError, ConnectionError):
                 pass
 
+    # Tahmin grafiği güvencesi: panelde gösterilen şehir için saatlik tahmini
+    # (cache'li, ücretsiz Open-Meteo) çek → UI grafiği get_last_forecast'tan okur.
+    panel_weather = get_last_weather()
+    chart_city = (panel_weather or {}).get("city") or _focus_city_from_tools(new_messages) or _user_location
+    if chart_city:
+        try:
+            get_hourly_forecast(chart_city, days=3, lang=_current_language)
+        except Exception:
+            pass
+
     yield from _stream_chunks(final_text)
 
 
 _GENEL_ONERILER = [
-    "Bulunduğum yerde bugün hava nasıl?",
-    "Yakınımda ne yapabilirim?",
-    "What's the weather like near me today?",
-    "Recommend something to do nearby",
+    "Bugün dışarıda yürüyüş yapmak için hava uygun mu?",
+    "Bu hafta sonu piknik için en iyi gün hangisi?",
+    "Is it a good day to go cycling or should I stay indoors?",
+    "What outdoor activities do you recommend for this week?",
 ]
 
 
 def generate_location_suggestions(city: str, country: str, weather: dict) -> list[str]:
     try:
         lang_instruction = "Türkçe yaz." if country == "TR" else "Write in English."
+        temp = weather.get("temperature", "?")
+        condition = weather.get("condition", "")
+        humidity = weather.get("humidity", "")
+        wind = weather.get("wind_speed", "")
+        feels_like = weather.get("feels_like", "")
+        weather_detail = (
+            f"{temp}°C, {condition}"
+            + (f", hissedilen {feels_like}°C" if feels_like else "")
+            + (f", nem %{humidity}" if humidity else "")
+            + (f", rüzgar {wind} km/h" if wind else "")
+        )
+        if country == "TR":
+            examples = (
+                f"'{city}'de bu havada sabah koşusu yapılır mı?', "
+                f"'Bugün {temp}°C ile dışarıda oturmak mantıklı mı?', "
+                f"'{city}'nin hangi semtinde kapalı aktivite bulabilirim?', "
+                f"'Bu hafta sonu {city}'de hava yağışlı olacak mı?'"
+            )
+        else:
+            examples = (
+                f"'Is {temp}°C in {city} warm enough for a picnic?', "
+                f"'What should I wear for outdoor dining in {city} today?', "
+                f"'Are there any rooftop bars open in {city} with this weather?', "
+                f"'Will the weather in {city} clear up by evening?'"
+            )
         sys_msg = (
-            f"You are generating example prompts that a USER would type to a weather-based activity assistant. "
-            f"Generate exactly 4 short prompts written from the USER's perspective (first person), "
-            f"as if the user is asking the AI for recommendations or information. "
-            f"City: {city}. Current weather: {weather.get('temperature', '?')}°C, {weather.get('condition', '')}. "
+            f"You generate realistic, specific example prompts a USER would type to a weather-based activity assistant. "
+            f"City: {city}. Current weather: {weather_detail}. "
+            f"Generate exactly 4 prompts — each must be specific to THIS city and THIS weather (mention temperature, "
+            f"condition, or a local activity angle). Cover different angles: one about suitability for an activity, "
+            f"one about what to wear/prepare, one about a specific time of day or weekend plan, "
+            f"one about an indoor/outdoor venue or neighbourhood. "
+            f"Each prompt max 75 characters, written from USER perspective (first person), natural and conversational. "
+            f"Good examples: {examples}. "
             f"{lang_instruction} "
-            f"Each prompt must be max 60 characters, sound natural, and be city/weather specific. "
-            f"Examples of the correct style: 'Bugün İstanbul'da ne yapabilirim?', 'Kâğıthane'de akşam aktiviteleri öner'. "
-            f"Output only the 4 prompts, one per line, no numbering, no bullet points."
+            f"Output only the 4 prompts, one per line, no numbering, no bullet points, no quotes."
         )
         response = react_llm.invoke(
             [SystemMessage(content=sys_msg), HumanMessage(content="Generate suggestions.")],
-            config={"max_tokens": 250},
+            config={"max_tokens": 350},
         )
         lines = [l.strip().strip('"').strip("'") for l in (response.content or "").split("\n") if l.strip()]
         suggestions = [l for l in lines if l][:4]
@@ -587,44 +663,64 @@ def generate_location_suggestions(city: str, country: str, weather: dict) -> lis
 
 
 def generate_next_suggestion(history: list[dict]) -> tuple[str, str]:
-    """Konuşma bağlamına göre (placeholder_hint, full_suggestion) döndürür.
+    """AI'ın son mesajına göre kullanıcıya prompt önerisi döndürür.
 
     Hata durumunda ("", "") döner; uygulama etkilenmez.
     """
     try:
         lang = _current_language
-        recent = [m for m in history if not m.get("content", "").startswith('<div class="typing')]
-        tail = recent[-4:] if len(recent) >= 4 else recent
-        if not tail:
+        clean = [m for m in history if not (m.get("content") or "").startswith('<div class="typing')]
+
+        # AI'ın son mesajını bul
+        last_ai = next(
+            (m for m in reversed(clean) if m.get("role") == "assistant"),
+            None,
+        )
+        if not last_ai:
             return "", ""
 
-        convo_lines = []
-        for m in tail:
-            role = "Kullanıcı" if m["role"] == "user" else "Asistan"
-            text = (m.get("content") or "")[:300]
-            convo_lines.append(f"{role}: {text}")
-        convo_text = "\n".join(convo_lines)
+        # Kullanıcının son mesajını da bağlam için ekle
+        last_user = next(
+            (m for m in reversed(clean) if m.get("role") == "user"),
+            None,
+        )
+
+        ai_text = (last_ai.get("content") or "")[:800]
+        user_text = (last_user.get("content") or "")[:200] if last_user else ""
+
+        context = f"Kullanıcı: {user_text}\nAsistan: {ai_text}" if user_text else f"Asistan: {ai_text}"
 
         if lang == "tr":
             sys_msg = (
-                "Aşağıdaki konuşmaya bakarak, kullanıcının bir hava durumu aktivite asistanına "
-                "yazacağı TAM OLARAK BİR follow-up mesaj üret. "
-                "Mesaj kullanıcı bakış açısından olmalı (örn: 'Yakınımda kafe öner', 'Yarın hava nasıl olacak?'). "
-                "AI'ın kullanıcıya sorduğu sorular değil, kullanıcının AI'a yazdığı prompt tarzında olmalı. "
-                "Sadece mesajı yaz, başka hiçbir şey ekleme. Maksimum 80 karakter. Türkçe yaz."
+                "Aşağıda bir hava durumu aktivite asistanının verdiği yanıt var. "
+                "Bu yanıtı okuyan bir kullanıcının DOĞAL OLARAK SORACAĞI TAM OLARAK BİR sonraki prompt öner. "
+                "Öneri, asistanın yanıtında geçen spesifik detaylara (şehir, sıcaklık, etkinlik, mekan, saat vb.) doğrudan atıf yapmalı. "
+                "MUTLAKA bir ETKİNLİK veya AKTİVİTE içermeli (koşu, bisiklet, piknik, yürüyüş, kafe, müze, yüzme, tenis vb.). "
+                "Kaliteli örnekler:\n"
+                "- Asistan 'Kadıköy'de 28°C, güneşli' dediyse → 'Kadıköy sahilinde sabah yüzüşü için erken mi gitsem?'\n"
+                "- Asistan 'Perşembe yağmur bekleniyor' dediyse → 'Yağmur günü için yakınımda kapalı spor salonu öner'\n"
+                "- Asistan 'UV indeksi 8' dediyse → 'UV yüksekken sabah 7-9 arası koşu güvenli mi?'\n"
+                "- Asistan 'Rüzgar 30 km/h' dediyse → 'Bu rüzgarla açık denizde kano yapmak tehlikeli mi?'\n"
+                "Kullanıcı bakış açısından yaz (birinci tekil şahıs). Sadece öneriyi yaz. Maksimum 90 karakter. Türkçe."
             )
         else:
             sys_msg = (
-                "Given the conversation below, generate EXACTLY ONE follow-up message "
-                "that the USER would type to a weather-based activity assistant. "
-                "Write it from the user's perspective (e.g. 'Recommend a cafe nearby', 'What about tomorrow?'). "
-                "Not a question the AI asks, but a prompt the user sends. "
-                "Output only the message, nothing else. Maximum 80 characters. Write in English."
+                "Below is a response from a weather-based activity assistant. "
+                "Generate EXACTLY ONE natural follow-up prompt that a user would type after reading this response. "
+                "The prompt MUST directly reference specific details from the assistant's reply "
+                "(city, temperature, activity mentioned, venue, time of day, forecast day, UV level, wind, etc.). "
+                "It MUST include a specific ACTIVITY or EVENT (running, cycling, picnic, hiking, swimming, tennis, etc.). "
+                "Quality examples:\n"
+                "- If assistant said 'Paris, 26°C sunny' → 'Is the Seine riverside nice for an evening jog today?'\n"
+                "- If assistant said 'rain expected Thursday' → 'Any good indoor climbing gyms near the city centre?'\n"
+                "- If assistant said 'UV index 9' → 'Best time for a morning hike to avoid the high UV?'\n"
+                "- If assistant said 'wind 35 km/h' → 'Too windy for paddleboarding or should I try kitesurfing?'\n"
+                "Write from user's perspective (first person). Output only the prompt. Maximum 90 characters. English."
             )
 
         response = react_llm.invoke(
-            [SystemMessage(content=sys_msg), HumanMessage(content=convo_text)],
-            config={"max_tokens": 80},
+            [SystemMessage(content=sys_msg), HumanMessage(content=context)],
+            config={"max_tokens": 120},
         )
         suggestion = (response.content or "").strip().strip('"').strip("'")
         if not suggestion:

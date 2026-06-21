@@ -24,6 +24,7 @@ if str(REPO_ROOT) not in sys.path:
 from dotenv import load_dotenv  # noqa: E402
 from langchain_openai import ChatOpenAI  # noqa: E402
 
+import tools.forecast as forecast_tool  # noqa: E402
 import tools.weather as weather_tool  # noqa: E402
 from agent import run_skywise_traced  # noqa: E402
 from eval.metrics import (  # noqa: E402
@@ -34,7 +35,7 @@ from eval.metrics import (  # noqa: E402
     personalization_score,
     render_markdown_report,
 )
-from eval.mock_weather import MockWeatherProvider  # noqa: E402
+from eval.mock_weather import MockForecastProvider, MockWeatherProvider  # noqa: E402
 
 load_dotenv()
 
@@ -42,14 +43,6 @@ load_dotenv()
 def load_scenarios(path: str) -> list[dict]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
-
-
-def build_mock_provider(scenarios: list[dict]) -> MockWeatherProvider:
-    overrides: dict[str, dict] = {}
-    for s in scenarios:
-        if s.get("weather_override"):
-            overrides[s["city"]] = s["weather_override"]
-    return MockWeatherProvider(overrides)
 
 
 def run_one(scenario: dict, judge_llm) -> dict:
@@ -132,8 +125,9 @@ def main() -> None:
 
     use_mock = not args.no_mock
     if use_mock:
-        provider = build_mock_provider(scenarios)
-        weather_tool.set_weather_provider(provider)
+        overrides = {s["city"]: s["weather_override"] for s in scenarios if s.get("weather_override")}
+        weather_tool.set_weather_provider(MockWeatherProvider(overrides))
+        forecast_tool.set_forecast_provider(MockForecastProvider(overrides))
 
     judge_llm = ChatOpenAI(
         model=args.judge_model,

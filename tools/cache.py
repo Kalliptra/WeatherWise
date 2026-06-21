@@ -55,7 +55,7 @@ def get_or_fetch(key: tuple[str, ...], fetch_fn: Callable[[], Any], ttl_same_day
     if CACHE_DISABLED:
         return fetch_fn()
 
-    cache_key = "|".join(key)
+    cache_key = "skywise:cache:" + "|".join(str(k) for k in key)
     today = _today()
 
     # L1: in-memory

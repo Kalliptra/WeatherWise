@@ -410,6 +410,94 @@ def render_panel_placeholder(message: str) -> str:
     )
 
 
+def render_forecast_chart(forecast: dict, horizon: int = 48):
+    """tools.forecast.get_hourly_forecast() çıktısından Plotly figürü üretir.
+
+    Sıcaklık çizgisi (sol eksen) + yağış olasılığı barları (sağ eksen), yağış
+    pencereleri gölgeli, UV zirvesi işaretli. Koyu temaya uygun, saydam zemin.
+    Veri yoksa veya plotly yoksa None döner (grafik gizli kalır).
+    """
+    if not forecast:
+        return None
+    hours = forecast.get("hours") or []
+    if not hours:
+        return None
+
+    from datetime import datetime as _dt
+
+    now_iso = _dt.now().strftime("%Y-%m-%dT%H:00")
+    upcoming = [h for h in hours if h["iso"] >= now_iso][:horizon]
+    if len(upcoming) < 2:
+        upcoming = hours[:horizon]
+    if len(upcoming) < 2:
+        return None
+
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        return None
+
+    xs = [_dt.fromisoformat(h["iso"]) for h in upcoming]
+    temps = [h["temp"] for h in upcoming]
+    probs = [h["precip_prob"] for h in upcoming]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=xs, y=probs, name="Yağış olasılığı",
+        marker_color="rgba(96,165,250,0.45)", yaxis="y2",
+        hovertemplate="%{x|%a %H:%M}<br>Yağış %%{y}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=xs, y=temps, name="Sıcaklık", mode="lines",
+        line=dict(color="#f5a623", width=3, shape="spline"),
+        hovertemplate="%{x|%a %H:%M}<br>%{y}°C<extra></extra>",
+    ))
+
+    # Yağış pencerelerini gölgele
+    span_start = None
+    prev = None
+    for h, x in zip(upcoming, xs):
+        if h["is_rainy"]:
+            if span_start is None:
+                span_start = x
+            prev = x
+        elif span_start is not None:
+            fig.add_vrect(x0=span_start, x1=prev, fillcolor="rgba(96,165,250,0.12)",
+                          line_width=0, layer="below")
+            span_start = None
+    if span_start is not None and prev is not None:
+        fig.add_vrect(x0=span_start, x1=prev, fillcolor="rgba(96,165,250,0.12)",
+                      line_width=0, layer="below")
+
+    # UV zirvesi
+    uv_peak = max(upcoming, key=lambda h: h["uv"])
+    if uv_peak["uv"] >= 6:
+        fig.add_annotation(
+            x=_dt.fromisoformat(uv_peak["iso"]), y=uv_peak["temp"],
+            text=f"☀️ UV {uv_peak['uv']}", showarrow=True, arrowhead=0,
+            font=dict(color="#fcd34d", size=11), arrowcolor="rgba(252,211,77,0.6)",
+            ax=0, ay=-28,
+        )
+
+    fig.update_layout(
+        margin=dict(l=8, r=8, t=28, b=8),
+        height=240,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#aab4d0", size=11),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0,
+                    bgcolor="rgba(0,0,0,0)"),
+        xaxis=dict(showgrid=False, tickformat="%a %H:%M", color="#8a93ad"),
+        yaxis=dict(title="°C", showgrid=True, gridcolor="rgba(255,255,255,0.06)",
+                   color="#8a93ad", zeroline=False),
+        yaxis2=dict(title="Yağış %", overlaying="y", side="right", range=[0, 100],
+                    showgrid=False, color="#8a93ad"),
+        bargap=0.1,
+        hovermode="x unified",
+    )
+    return fig
+
+
 # ---- CSS -------------------------------------------------------------------
 
 CUSTOM_CSS = """
@@ -965,6 +1053,18 @@ button.suggestion-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 14px 30px var(--glow) !important;
 }
+
+/* ---- Tahmin grafiği ---- */
+.forecast-plot {
+    margin-top: 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    padding: 8px 6px;
+}
+.forecast-plot .js-plotly-plot,
+.forecast-plot .plotly,
+.forecast-plot .plot-container { background: transparent !important; }
 
 /* ---- Venue kartları ---- */
 .map-panel { margin-top: 14px; }
