@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import threading
 import time
 from collections.abc import Iterator
 from typing import Literal, Optional
@@ -14,6 +15,7 @@ from langgraph.prebuilt import create_react_agent
 from core.llms import evaluator_llm, itinerary_llm, react_llm
 from core.prompts import get_prompt
 from core.graph import _parse_supervisor
+from tools.memory import extract_and_update, format_memory_block, load_memory
 from tools.uv import get_uv_index
 from tools.venue import find_venues, format_venues_for_llm
 from tools.weather import (
@@ -106,11 +108,13 @@ _WEATHER_ONLY_EN = frozenset([
 _ACTIVITY_TRIGGERS = frozenset([
     # TR
     "müze", "muze", "kafe", "park", "restoran", "spor", "aktivite",
-    "öneri", "oneri", "nereye", "ne yapabilirim", "gez", "git", "yap",
+    "öneri", "oneri", "öner", "oner", "nereye", "ne yapabilirim", "gez", "git", "yap",
     "plaj", "sinema", "galeri", "kütüphane", "kutuphane", "manzara",
+    "etkinlik", "etkinlikleri", "gezi", "yürüyüş", "yuruyus", "piknik",
     # EN
-    "museum", "cafe", "restaurant", "activity", "suggest", "recommend",
+    "museum", "cafe", "restaurant", "activity", "activities", "suggest", "recommend",
     "where", "what can", "beach", "cinema", "gallery", "library", "viewpoint",
+    "walk", "hike", "picnic",
 ])
 _FOLLOWUP_TR = frozenset(["orada", "başka", "baska", "daha", "peki", "diğer", "diger"])
 _FOLLOWUP_EN = frozenset(["there", "else", "another", "other", "more", "instead"])
@@ -136,7 +140,10 @@ def _classify_intent(
         return "follow_up"
     if any(kw in lower for kw in _ACTIVITY_TRIGGERS):
         return "activity"
+    # "hava" tek başına weather_only sayılır; ama "açık hava" + eylem varsa activity
     if tokens & weather_kw:
+        if "açık hava" in lower or "outdoor" in lower:
+            return "activity"
         return "weather_only"
     return "other"
 
@@ -285,7 +292,7 @@ _chat_worker = create_react_agent(
 
 # ---- Yardımcılar ----
 
-def _gradio_to_lc_messages(messages: list[dict]) -> list:
+def _gradio_to_lc_messages(messages: list[dict], username: Optional[str] = None) -> list:
     global _current_language
 
     # Dil tespiti: ilk kullanıcı mesajından
@@ -294,7 +301,10 @@ def _gradio_to_lc_messages(messages: list[dict]) -> list:
             _current_language = _detect_language(m["content"])
             break
 
-    lc: list = [SystemMessage(content=get_prompt("chat", _current_language))]
+    base_prompt = get_prompt("chat", _current_language)
+    memory_block = format_memory_block(load_memory(username), _current_language)
+    system_content = base_prompt + ("\n\n" + memory_block if memory_block else "")
+    lc: list = [SystemMessage(content=system_content)]
     for m in messages:
         role = m.get("role")
         content = (m.get("content") or "").strip()
@@ -437,7 +447,7 @@ def _generate_itinerary_for_chat(
 
 # ---- Public API ----
 
-def chat_skywise(messages: list[dict]) -> Iterator[str]:
+def chat_skywise(messages: list[dict], username: Optional[str] = None) -> Iterator[str]:
     """Sohbet tabanlı SkyWise asistanı.
 
     Girdi: Gradio Chatbot(type="messages") formatı —
@@ -445,7 +455,7 @@ def chat_skywise(messages: list[dict]) -> Iterator[str]:
     Çıktı: kümülatif metin parçaları (streaming) — son chunk tam yanıttır.
     """
     # Dil tespiti + LangChain mesajlarına dönüşüm (bu _current_language'ı günceller)
-    lc_messages = _gradio_to_lc_messages(messages)
+    lc_messages = _gradio_to_lc_messages(messages, username=username)
     n_original = len(lc_messages)
 
     # Intent sınıflandırma (dil güncel olduktan sonra)
@@ -505,6 +515,15 @@ def chat_skywise(messages: list[dict]) -> Iterator[str]:
                 final_text = final_text + sep + itinerary
         except Exception:
             pass
+
+        # Hafıza güncelleme: arka planda çalıştır, ana akışı bloke etme
+        focus_city = _focus_city_from_tools(new_messages) or _user_location
+        full_messages = messages + [{"role": "assistant", "content": final_text}]
+        threading.Thread(
+            target=extract_and_update,
+            args=(full_messages, focus_city, _current_language, username),
+            daemon=True,
+        ).start()
     else:
         final_text = worker_text
 

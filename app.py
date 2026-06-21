@@ -41,6 +41,12 @@ from tools.weather import (  # noqa: E402
 from tools.venue import clear_last_venues, geocode_city, get_last_venues  # noqa: E402
 
 DEFAULT_CITY = os.getenv("DEFAULT_CITY", "Istanbul")
+IS_HF_SPACE = bool(os.getenv("SPACE_ID"))
+
+# HF Spaces'te OAuth profile annotasyonunu dinamik ekle.
+# Yerelde session middleware olmadığından annotasyon hata verir; bu yüzden koşullu.
+def _inject_oauth_annotation():
+    respond_from_history.__annotations__["oauth_profile"] = "gr.OAuthProfile | None"
 
 ORNEK_SORULAR = [
     "Bugün İstanbul'da hava nasıl, ne yapabilirim?",
@@ -163,7 +169,7 @@ def pre_submit(user_message: str, queued: list):
     return "", new_queued, render_queued_display(new_queued)
 
 
-def respond_from_history(history: list[dict], queued: list):
+def respond_from_history(history: list[dict], queued: list, oauth_profile=None):
     """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display)."""
     if not queued:
         return
@@ -178,6 +184,7 @@ def respond_from_history(history: list[dict], queued: list):
 
     yield gr.update(value=history, visible=True), gr.update(), gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(visible=False), [], gr.update(), remaining, qd
 
+    username = oauth_profile.preferred_username if oauth_profile else None
     convo_for_agent = history[:-1]
     clear_last_weather()
     clear_last_venues()
@@ -186,7 +193,7 @@ def respond_from_history(history: list[dict], queued: list):
     map_sent = False
 
     try:
-        for partial in chat_skywise(convo_for_agent):
+        for partial in chat_skywise(convo_for_agent, username=username):
             history[-1]["content"] = partial if partial else TYPING_INDICATOR
             weather = get_last_weather()
             venues = get_last_venues()
@@ -316,14 +323,17 @@ with gr.Blocks(
     css=CUSTOM_CSS,
     js=FORCE_DARK_JS,
 ) as demo:
-    gr.HTML(
-        """
-        <div class="topbar">
-            <div class="brand"><span class="brand-logo">◐</span> SkyWise</div>
-            <div class="brand-tag">Hava durumuna göre kişisel aktivite asistanın</div>
-        </div>
-        """,
-    )
+    with gr.Row(elem_classes="topbar-row"):
+        gr.HTML(
+            """
+            <div class="topbar">
+                <div class="brand"><span class="brand-logo">◐</span> SkyWise</div>
+                <div class="brand-tag">Hava durumuna göre kişisel aktivite asistanın</div>
+            </div>
+            """,
+        )
+        if IS_HF_SPACE:
+            gr.LoginButton(elem_classes="login-btn")
 
     location_state = gr.State("")
     queued_state = gr.State([])
@@ -404,6 +414,9 @@ with gr.Blocks(
     demo.load(None, None, geo_coords, js=GEO_JS, api_name=False)
     geo_coords.change(apply_geolocation, geo_coords, [weather_panel, theme_state, sug1, sug2, sug3, sug4], api_name=False)
 
+
+if IS_HF_SPACE:
+    _inject_oauth_annotation()
 
 if __name__ == "__main__":
     demo.queue(max_size=20)

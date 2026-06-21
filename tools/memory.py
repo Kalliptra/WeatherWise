@@ -1,0 +1,220 @@
+"""Kullanıcı hafızası — Upstash Redis'te kalıcı, kullanıcı bazlı, LLM destekli tercih çıkarımı.
+
+username sağlanmadıysa (OAuth girişi yok) tüm hafıza işlemleri no-op olarak davranır;
+cache (hava/mekan) her durumda çalışmaya devam eder.
+"""
+
+from __future__ import annotations
+
+import json
+import threading
+from datetime import date
+from typing import Optional
+
+MAX_CONVERSATIONS = 10
+
+_lock = threading.Lock()
+_cache: dict[str, dict] = {}  # {username: memory_data}
+
+
+def _memory_key(username: Optional[str]) -> Optional[str]:
+    return f"skywise:user:{username}" if username else None
+
+
+def _get_redis():
+    import os
+    url = os.getenv("UPSTASH_REDIS_REST_URL")
+    token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+    if not url or not token:
+        return None
+    try:
+        from upstash_redis import Redis
+        return Redis(url=url, token=token)
+    except Exception:
+        return None
+
+
+def load_memory(username: Optional[str] = None) -> dict:
+    """Kullanıcı hafızasını yükler. username yoksa boş dict döner."""
+    key = _memory_key(username)
+    if not key:
+        return {}
+
+    with _lock:
+        if username in _cache:
+            return dict(_cache[username])
+
+    r = _get_redis()
+    if r:
+        try:
+            raw = r.get(key)
+            if raw:
+                data = json.loads(raw) if isinstance(raw, str) else raw
+                with _lock:
+                    _cache[username] = data
+                return dict(data)
+        except Exception:
+            pass
+
+    return {}
+
+
+def save_memory(username: Optional[str], data: dict) -> None:
+    """Kullanıcı hafızasını kaydeder. username yoksa no-op."""
+    key = _memory_key(username)
+    if not key:
+        return
+
+    with _lock:
+        _cache[username] = dict(data)
+
+    r = _get_redis()
+    if r:
+        try:
+            r.set(key, json.dumps(data, ensure_ascii=False))
+        except Exception:
+            pass
+
+
+def format_memory_block(memory: dict, lang: str = "tr") -> str:
+    """Hafızayı sistem promptuna eklenecek metin bloğuna dönüştürür."""
+    if not memory:
+        return ""
+
+    prefs = memory.get("preferences", {})
+    liked = prefs.get("liked", [])
+    disliked = prefs.get("disliked", [])
+    notes = prefs.get("notes", "")
+    cities = memory.get("favorite_cities", [])
+    conversations = memory.get("conversations", [])
+
+    if not liked and not disliked and not notes and not cities and not conversations:
+        return ""
+
+    parts = []
+    if lang == "tr":
+        parts.append("## Kullanıcı Hafızası")
+        if liked:
+            parts.append(f"Sevdiği aktiviteler: {', '.join(liked)}")
+        if disliked:
+            parts.append(f"Sevmediği aktiviteler: {', '.join(disliked)}")
+        if notes:
+            parts.append(f"Notlar: {notes}")
+        if cities:
+            parts.append(f"Ziyaret ettiği şehirler: {', '.join(cities[:5])}")
+        if conversations:
+            parts.append("Son konuşmalar:")
+            for c in conversations[-3:]:
+                city_str = f" ({c['city']})" if c.get("city") else ""
+                parts.append(f"  - {c.get('date', '')}{city_str}: {c.get('summary', '')}")
+        parts.append(
+            "Bu bilgileri önerilerinde kullan ama hafızadan açıkça bahsetme. "
+            "Kullanıcı sormadıkça 'geçen sefer' gibi ifadeler kullanma."
+        )
+    else:
+        parts.append("## User Memory")
+        if liked:
+            parts.append(f"Liked activities: {', '.join(liked)}")
+        if disliked:
+            parts.append(f"Disliked activities: {', '.join(disliked)}")
+        if notes:
+            parts.append(f"Notes: {notes}")
+        if cities:
+            parts.append(f"Cities visited: {', '.join(cities[:5])}")
+        if conversations:
+            parts.append("Recent conversations:")
+            for c in conversations[-3:]:
+                city_str = f" ({c['city']})" if c.get("city") else ""
+                parts.append(f"  - {c.get('date', '')}{city_str}: {c.get('summary', '')}")
+        parts.append(
+            "Use this to personalize suggestions but don't explicitly mention the memory. "
+            "Don't say 'last time' unless the user asks."
+        )
+
+    return "\n".join(parts)
+
+
+def extract_and_update(
+    messages: list[dict],
+    city: Optional[str],
+    lang: str,
+    username: Optional[str] = None,
+) -> None:
+    """Konuşmadan tercih çıkar ve hafızayı güncelle. Arka planda thread olarak çalışır.
+
+    username yoksa (giriş yapılmamış) erken çıkar.
+    """
+    if not username:
+        return
+
+    try:
+        from langchain_core.messages import HumanMessage, SystemMessage
+        from core.llms import evaluator_llm
+
+        tail = messages[-6:] if len(messages) > 6 else messages
+        convo = "\n".join(
+            f"{'Kullanıcı' if m['role'] == 'user' else 'Asistan'}: {(m.get('content') or '')[:400]}"
+            for m in tail
+        )
+
+        if lang == "tr":
+            sys_content = (
+                "Aşağıdaki konuşmayı analiz et ve yalnızca şu JSON'u döndür:\n"
+                '{"liked": ["sevilen aktiviteler"], "disliked": ["sevilmeyen aktiviteler"], '
+                '"notes": "önemli tercih notu veya boş string", "summary": "tek cümle konuşma özeti"}\n'
+                "liked/disliked listelerini sadece açıkça belirtilen veya güçlü biçimde ima edilen "
+                "tercihlerle doldur; belirsizse boş bırak. Başka hiçbir şey yazma."
+            )
+        else:
+            sys_content = (
+                "Analyze the conversation below and return only this JSON:\n"
+                '{"liked": ["liked activities"], "disliked": ["disliked activities"], '
+                '"notes": "important preference note or empty string", "summary": "one-sentence summary"}\n'
+                "Only fill liked/disliked with explicitly stated or strongly implied preferences; "
+                "leave empty if unclear. Return nothing else."
+            )
+
+        raw = evaluator_llm.invoke([
+            SystemMessage(content=sys_content),
+            HumanMessage(content=convo),
+        ]).content.strip()
+
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start == -1 or end == 0:
+            return
+        extracted = json.loads(raw[start:end])
+
+        memory = load_memory(username)
+        prefs = memory.setdefault("preferences", {"liked": [], "disliked": [], "notes": ""})
+
+        for item in extracted.get("liked", []):
+            if item and item not in prefs["liked"]:
+                prefs["liked"].append(item)
+        for item in extracted.get("disliked", []):
+            if item and item not in prefs["disliked"]:
+                prefs["disliked"].append(item)
+        if extracted.get("notes"):
+            prefs["notes"] = extracted["notes"]
+
+        if city:
+            cities = memory.setdefault("favorite_cities", [])
+            if city not in cities:
+                cities.insert(0, city)
+            memory["favorite_cities"] = cities[:10]
+
+        summary = extracted.get("summary", "")
+        if summary:
+            convos = memory.setdefault("conversations", [])
+            convos.append({
+                "date": date.today().isoformat(),
+                "city": city or "",
+                "summary": summary,
+            })
+            memory["conversations"] = convos[-MAX_CONVERSATIONS:]
+
+        memory["language"] = lang
+        save_memory(username, memory)
+
+    except Exception:
+        pass
