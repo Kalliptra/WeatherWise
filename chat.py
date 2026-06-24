@@ -320,7 +320,7 @@ _chat_worker = create_react_agent(
 
 # ---- Yardımcılar ----
 
-def _gradio_to_lc_messages(messages: list[dict], username: Optional[str] = None) -> list:
+def _gradio_to_lc_messages(messages: list[dict], anon_id: Optional[str] = None) -> list:
     global _current_language
 
     # Dil tespiti: ilk kullanıcı mesajından
@@ -330,7 +330,7 @@ def _gradio_to_lc_messages(messages: list[dict], username: Optional[str] = None)
             break
 
     base_prompt = get_prompt("chat", _current_language)
-    memory_block = format_memory_block(load_memory(username), _current_language)
+    memory_block = format_memory_block(load_memory(anon_id), _current_language)
 
     # Algılanan konum (geolocation) varsa sistem promptuna ekle
     location_block = ""
@@ -499,7 +499,7 @@ def _generate_itinerary_for_chat(
 
 # ---- Public API ----
 
-def chat_skywise(messages: list[dict], username: Optional[str] = None) -> Iterator[str]:
+def chat_skywise(messages: list[dict], anon_id: Optional[str] = None) -> Iterator[str]:
     """Sohbet tabanlı SkyWise asistanı.
 
     Girdi: Gradio Chatbot(type="messages") formatı —
@@ -507,7 +507,7 @@ def chat_skywise(messages: list[dict], username: Optional[str] = None) -> Iterat
     Çıktı: kümülatif metin parçaları (streaming) — son chunk tam yanıttır.
     """
     # Dil tespiti + LangChain mesajlarına dönüşüm (bu _current_language'ı günceller)
-    lc_messages = _gradio_to_lc_messages(messages, username=username)
+    lc_messages = _gradio_to_lc_messages(messages, anon_id=anon_id)
     n_original = len(lc_messages)
 
     # Intent sınıflandırma (dil güncel olduktan sonra)
@@ -564,7 +564,7 @@ def chat_skywise(messages: list[dict], username: Optional[str] = None) -> Iterat
         full_messages = messages + [{"role": "assistant", "content": final_text}]
         threading.Thread(
             target=extract_and_update,
-            args=(full_messages, focus_city, _current_language, username),
+            args=(full_messages, focus_city, _current_language, anon_id),
             daemon=True,
         ).start()
     else:

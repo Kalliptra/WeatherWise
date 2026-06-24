@@ -1,11 +1,11 @@
-"""Sohbet oturumları (session) — Upstash Redis'te kalıcı, kullanıcı/anon bazlı.
+"""Sohbet oturumları (session) — Upstash Redis'te kalıcı, anonim (anon_id) bazlı.
 
 owner çözümü:
-  - Giriş yapan kullanıcı  -> "user:{username}"  (TTL yok, kalıcı)
-  - Anonim kullanıcı       -> "anon:{anon_id}"   (TTL var, geçici — 24 saat)
+  - Anonim kullanıcı -> "anon:{anon_id}" (TTL var, geçici — 24 saat)
 
-Redis yoksa modül içi bellek sözlüğüne düşer (yerel geliştirme). Hava/mekan
-cache'i (tools/cache.py) bu modülden bağımsızdır ve session'lar arası paylaşılır.
+Giriş/kullanıcı kavramı yoktur; her şey tarayıcıdaki localStorage anon_id ile çalışır.
+Redis yoksa modül içi bellek sözlüğüne düşer (yerel geliştirme). Hava/mekan cache'i
+(tools/cache.py) bu modülden bağımsızdır ve session'lar arası paylaşılır.
 """
 
 from __future__ import annotations
@@ -27,13 +27,11 @@ _mem_idx: dict[str, list[dict]] = {}
 
 # ---- Anahtar / owner yardımcıları ----
 
-def _owner(username: Optional[str], anon_id: Optional[str]) -> tuple[Optional[str], bool]:
-    """(owner, is_anon) döndürür. Kimlik yoksa (None, False)."""
-    if username:
-        return f"user:{username}", False
+def _owner(anon_id: Optional[str]) -> Optional[str]:
+    """owner döndürür (anon:{anon_id}). Kimlik yoksa None."""
     if anon_id:
-        return f"anon:{anon_id}", True
-    return None, False
+        return f"anon:{anon_id}"
+    return None
 
 
 def _idx_key(owner: str) -> str:
@@ -82,13 +80,10 @@ def _read_index(owner: str, r) -> list[dict]:
         return [dict(e) for e in _mem_idx.get(owner, [])]
 
 
-def _write_index(owner: str, index: list[dict], is_anon: bool, r) -> None:
+def _write_index(owner: str, index: list[dict], r) -> None:
     if r:
         try:
-            if is_anon:
-                r.set(_idx_key(owner), json.dumps(index, ensure_ascii=False), ex=ANON_TTL)
-            else:
-                r.set(_idx_key(owner), json.dumps(index, ensure_ascii=False))
+            r.set(_idx_key(owner), json.dumps(index, ensure_ascii=False), ex=ANON_TTL)
         except Exception:
             pass
         return
@@ -102,18 +97,18 @@ def _sort_index(index: list[dict]) -> list[dict]:
 
 # ---- Public API ----
 
-def list_sessions(username: Optional[str], anon_id: Optional[str]) -> list[dict]:
+def list_sessions(anon_id: Optional[str]) -> list[dict]:
     """Sidebar için session metadata listesi (updated'a göre yeniden eskiye)."""
-    owner, _ = _owner(username, anon_id)
+    owner = _owner(anon_id)
     if not owner:
         return []
     r = _get_redis()
     return _sort_index(_read_index(owner, r))
 
 
-def load_session(username: Optional[str], anon_id: Optional[str], sid: str) -> Optional[dict]:
+def load_session(anon_id: Optional[str], sid: str) -> Optional[dict]:
     """Tam session verisini döndürür (messages + panel snapshot). Yoksa None."""
-    owner, _ = _owner(username, anon_id)
+    owner = _owner(anon_id)
     if not owner or not sid:
         return None
     r = _get_redis()
@@ -131,7 +126,6 @@ def load_session(username: Optional[str], anon_id: Optional[str], sid: str) -> O
 
 
 def save_session(
-    username: Optional[str],
     anon_id: Optional[str],
     sid: str,
     *,
@@ -141,9 +135,9 @@ def save_session(
 ) -> None:
     """Session verisini yazar + index girişini (title/updated) günceller.
 
-    Anonim owner'da hem data hem index TTL ile yazılır (her yazımda yenilenir).
+    Hem data hem index TTL ile yazılır (her yazımda yenilenir).
     """
-    owner, is_anon = _owner(username, anon_id)
+    owner = _owner(anon_id)
     if not owner or not sid:
         return
 
@@ -165,10 +159,7 @@ def save_session(
     if r:
         try:
             payload = json.dumps(data, ensure_ascii=False)
-            if is_anon:
-                r.set(_data_key(owner, sid), payload, ex=ANON_TTL)
-            else:
-                r.set(_data_key(owner, sid), payload)
+            r.set(_data_key(owner, sid), payload, ex=ANON_TTL)
         except Exception:
             pass
     else:
@@ -183,11 +174,11 @@ def save_session(
         index.append(entry)
     entry["title"] = data["title"]
     entry["updated"] = now
-    _write_index(owner, index, is_anon, r)
+    _write_index(owner, index, r)
 
 
-def delete_session(username: Optional[str], anon_id: Optional[str], sid: str) -> None:
-    owner, is_anon = _owner(username, anon_id)
+def delete_session(anon_id: Optional[str], sid: str) -> None:
+    owner = _owner(anon_id)
     if not owner or not sid:
         return
     r = _get_redis()
@@ -201,11 +192,11 @@ def delete_session(username: Optional[str], anon_id: Optional[str], sid: str) ->
             _mem.get(owner, {}).pop(sid, None)
 
     index = [e for e in _read_index(owner, r) if e.get("id") != sid]
-    _write_index(owner, index, is_anon, r)
+    _write_index(owner, index, r)
 
 
-def rename_session(username: Optional[str], anon_id: Optional[str], sid: str, title: str) -> None:
-    owner, is_anon = _owner(username, anon_id)
+def rename_session(anon_id: Optional[str], sid: str, title: str) -> None:
+    owner = _owner(anon_id)
     if not owner or not sid:
         return
     title = (title or "").strip()
@@ -214,16 +205,13 @@ def rename_session(username: Optional[str], anon_id: Optional[str], sid: str, ti
     r = _get_redis()
 
     # data başlığını güncelle
-    data = load_session(username, anon_id, sid)
+    data = load_session(anon_id, sid)
     if data:
         data["title"] = title
         if r:
             try:
                 payload = json.dumps(data, ensure_ascii=False)
-                if is_anon:
-                    r.set(_data_key(owner, sid), payload, ex=ANON_TTL)
-                else:
-                    r.set(_data_key(owner, sid), payload)
+                r.set(_data_key(owner, sid), payload, ex=ANON_TTL)
             except Exception:
                 pass
         else:
@@ -235,4 +223,4 @@ def rename_session(username: Optional[str], anon_id: Optional[str], sid: str, ti
     entry = next((e for e in index if e.get("id") == sid), None)
     if entry is not None:
         entry["title"] = title
-        _write_index(owner, index, is_anon, r)
+        _write_index(owner, index, r)

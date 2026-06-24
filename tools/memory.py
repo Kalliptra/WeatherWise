@@ -1,7 +1,9 @@
-"""Kullanıcı hafızası — Upstash Redis'te kalıcı, kullanıcı bazlı, LLM destekli tercih çıkarımı.
+"""Anonim kullanıcı hafızası — Upstash Redis'te anon_id bazlı, LLM destekli tercih çıkarımı.
 
-username sağlanmadıysa (OAuth girişi yok) tüm hafıza işlemleri no-op olarak davranır;
-cache (hava/mekan) her durumda çalışmaya devam eder.
+Giriş/kullanıcı kavramı yoktur; her şey tarayıcıdaki localStorage anon_id ile çalışır.
+anon_id sağlanmadıysa tüm hafıza işlemleri no-op olarak davranır; cache (hava/mekan)
+her durumda çalışmaya devam eder. Anon hafıza session'larla aynı TTL ile tutulur ve her
+yazımda yenilenir.
 """
 
 from __future__ import annotations
@@ -13,12 +15,15 @@ from typing import Optional
 
 MAX_CONVERSATIONS = 10
 
+# Anonim hafıza için TTL (saniye). Her yazımda yenilenir (sessions ile aynı).
+ANON_TTL = 86400  # 24 saat
+
 _lock = threading.Lock()
-_cache: dict[str, dict] = {}  # {username: memory_data}
+_cache: dict[str, dict] = {}  # {anon_id: memory_data}
 
 
-def _memory_key(username: Optional[str]) -> Optional[str]:
-    return f"skywise:user:{username}" if username else None
+def _memory_key(anon_id: Optional[str]) -> Optional[str]:
+    return f"skywise:anon:{anon_id}" if anon_id else None
 
 
 def _get_redis():
@@ -34,15 +39,15 @@ def _get_redis():
         return None
 
 
-def load_memory(username: Optional[str] = None) -> dict:
-    """Kullanıcı hafızasını yükler. username yoksa boş dict döner."""
-    key = _memory_key(username)
+def load_memory(anon_id: Optional[str] = None) -> dict:
+    """Anonim hafızayı yükler. anon_id yoksa boş dict döner."""
+    key = _memory_key(anon_id)
     if not key:
         return {}
 
     with _lock:
-        if username in _cache:
-            return dict(_cache[username])
+        if anon_id in _cache:
+            return dict(_cache[anon_id])
 
     r = _get_redis()
     if r:
@@ -51,7 +56,7 @@ def load_memory(username: Optional[str] = None) -> dict:
             if raw:
                 data = json.loads(raw) if isinstance(raw, str) else raw
                 with _lock:
-                    _cache[username] = data
+                    _cache[anon_id] = data
                 return dict(data)
         except Exception:
             pass
@@ -59,19 +64,19 @@ def load_memory(username: Optional[str] = None) -> dict:
     return {}
 
 
-def save_memory(username: Optional[str], data: dict) -> None:
-    """Kullanıcı hafızasını kaydeder. username yoksa no-op."""
-    key = _memory_key(username)
+def save_memory(anon_id: Optional[str], data: dict) -> None:
+    """Anonim hafızayı kaydeder. anon_id yoksa no-op. TTL her yazımda yenilenir."""
+    key = _memory_key(anon_id)
     if not key:
         return
 
     with _lock:
-        _cache[username] = dict(data)
+        _cache[anon_id] = dict(data)
 
     r = _get_redis()
     if r:
         try:
-            r.set(key, json.dumps(data, ensure_ascii=False))
+            r.set(key, json.dumps(data, ensure_ascii=False), ex=ANON_TTL)
         except Exception:
             pass
 
@@ -134,21 +139,21 @@ def format_memory_block(memory: dict, lang: str = "tr") -> str:
     return "\n".join(parts)
 
 
-def get_activity_preferences(username: Optional[str]) -> list[str]:
-    """Kullanıcının kayıtlı aktivite tercihlerini döner. username yoksa boş liste."""
-    return load_memory(username).get("preferences", {}).get("liked", [])
+def get_activity_preferences(anon_id: Optional[str]) -> list[str]:
+    """Anonim kullanıcının kayıtlı aktivite tercihlerini döner. anon_id yoksa boş liste."""
+    return load_memory(anon_id).get("preferences", {}).get("liked", [])
 
 
 def update_activity_preferences(
-    username: Optional[str], categories: list[str], replace: bool = False
+    anon_id: Optional[str], categories: list[str], replace: bool = False
 ) -> None:
     """Aktivite tercihlerini doğrudan günceller (LLM çıkarımı gereksiz).
 
     replace=True ise mevcut listeyi siler ve yenisiyle değiştirir.
     """
-    if not username:
+    if not anon_id:
         return
-    memory = load_memory(username)
+    memory = load_memory(anon_id)
     prefs = memory.setdefault("preferences", {"liked": [], "disliked": [], "notes": ""})
     if replace:
         prefs["liked"] = [c for c in categories if c]
@@ -156,20 +161,20 @@ def update_activity_preferences(
         for cat in categories:
             if cat and cat not in prefs["liked"]:
                 prefs["liked"].append(cat)
-    save_memory(username, memory)
+    save_memory(anon_id, memory)
 
 
 def extract_and_update(
     messages: list[dict],
     city: Optional[str],
     lang: str,
-    username: Optional[str] = None,
+    anon_id: Optional[str] = None,
 ) -> None:
     """Konuşmadan tercih çıkar ve hafızayı güncelle. Arka planda thread olarak çalışır.
 
-    username yoksa (giriş yapılmamış) erken çıkar.
+    anon_id yoksa erken çıkar.
     """
-    if not username:
+    if not anon_id:
         return
 
     try:
@@ -210,7 +215,7 @@ def extract_and_update(
             return
         extracted = json.loads(raw[start:end])
 
-        memory = load_memory(username)
+        memory = load_memory(anon_id)
         prefs = memory.setdefault("preferences", {"liked": [], "disliked": [], "notes": ""})
 
         for item in extracted.get("liked", []):
@@ -239,7 +244,7 @@ def extract_and_update(
             memory["conversations"] = convos[-MAX_CONVERSATIONS:]
 
         memory["language"] = lang
-        save_memory(username, memory)
+        save_memory(anon_id, memory)
 
     except Exception:
         pass

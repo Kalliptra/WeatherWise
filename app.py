@@ -67,46 +67,6 @@ IS_HF_SPACE = bool(os.getenv("SPACE_ID"))
 # set() → generator bir sonraki yield öncesi temiz şekilde durur (Error göstermez).
 _abort = threading.Event()
 
-# HF Spaces'te OAuth profile annotasyonunu dinamik ekle.
-# Yerelde session middleware olmadığından annotasyon hata verir; bu yüzden koşullu.
-# Kullanıcı kimliğini tek noktada (resolve_account) çözüp username_state'e yazarız;
-# diğer tüm handler'lar username'i normal bir input olarak alır (oauth enjeksiyonu gerekmez).
-def _inject_oauth_annotation():
-    resolve_account.__annotations__["oauth_profile"] = "gr.OAuthProfile | None"
-
-
-def resolve_account(oauth_profile=None):
-    """Giriş yapan kullanıcının adını ve profil çipini döndürür.
-
-    Dönüş: (username, profile_chip_update)
-    - Anonim: ("", gizli boş çip)
-    - Girişli: (preferred_username, avatar+ad içeren görünür çip)
-    """
-    if not oauth_profile:
-        return "", gr.update(value="", visible=False)
-
-    username = oauth_profile.preferred_username
-    name = getattr(oauth_profile, "name", None) or username
-    picture = getattr(oauth_profile, "picture", "") or ""
-    profile_url = getattr(oauth_profile, "profile", "") or ""
-
-    avatar = (
-        f"<img src='{picture}' alt='{name}' referrerpolicy='no-referrer'>"
-        if picture
-        else "<span class='profile-avatar-fallback'>👤</span>"
-    )
-    inner = (
-        f"<div class='profile-inner'>{avatar}"
-        f"<span class='profile-name'>{name}</span></div>"
-    )
-    if profile_url:
-        inner = (
-            f"<a class='profile-link' href='{profile_url}' "
-            f"target='_blank' rel='noopener'>{inner}</a>"
-        )
-    return username, gr.update(value=inner, visible=True)
-
-
 # Anonim kullanıcıyı tarayıcı tarafında kalıcı bir kimlikle tanı (localStorage).
 ANON_ID_JS = """
 () => {
@@ -283,7 +243,7 @@ def pre_submit(user_message: str, queued: list):
     return "", new_queued, render_queued_display(new_queued)
 
 
-def _persist_turn(history, session_id, sessions, user_message, username, anon_id):
+def _persist_turn(history, session_id, sessions, user_message, anon_id):
     """Turun sonunda session'ı (mesajlar + panel snapshot) kaydeder ve güncel
     session listesini döndürür. Başlık ilk turda LLM ile üretilir, sonra korunur."""
     weather = get_last_weather()
@@ -302,16 +262,16 @@ def _persist_turn(history, session_id, sessions, user_message, username, anon_id
     else:
         title = generate_session_title(user_message, get_current_language())
     try:
-        save_session(username, anon_id, session_id, messages=history, panel=panel, title=title)
+        save_session(anon_id, session_id, messages=history, panel=panel, title=title)
     except Exception:
         pass
     try:
-        return list_sessions(username, anon_id)
+        return list_sessions(anon_id)
     except Exception:
         return sessions
 
 
-def respond_from_history(history, queued, session_id, sessions, username, anon_id):
+def respond_from_history(history, queued, session_id, sessions, anon_id):
     """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel,
     show_loc_btn, location_state, suggestion_box, queued_state, queued_display,
     session_id_state, sessions_state)."""
@@ -324,9 +284,9 @@ def respond_from_history(history, queued, session_id, sessions, username, anon_i
     qd = render_queued_display(remaining)
 
     # Kullanıcı bir kategori butonu seçtiyse tercihi Redis'e kaydet
-    if username and user_message in CATEGORY_PREFS:
+    if anon_id and user_message in CATEGORY_PREFS:
         try:
-            update_activity_preferences(username, CATEGORY_PREFS[user_message])
+            update_activity_preferences(anon_id, CATEGORY_PREFS[user_message])
         except Exception:
             pass
 
@@ -348,7 +308,7 @@ def respond_from_history(history, queued, session_id, sessions, username, anon_i
     map_sent = False
 
     try:
-        for partial in chat_skywise(convo_for_agent, username=username or None):
+        for partial in chat_skywise(convo_for_agent, anon_id=anon_id or None):
             if _abort.is_set():
                 return
             history[-1]["content"] = partial if partial else TYPING_INDICATOR
@@ -383,7 +343,7 @@ def respond_from_history(history, queued, session_id, sessions, username, anon_i
                 )
                 yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), locs, gr.update(), remaining, qd, session_id, sessions
 
-        new_sessions = _persist_turn(history, session_id, sessions, user_message, username, anon_id)
+        new_sessions = _persist_turn(history, session_id, sessions, user_message, anon_id)
 
         hint, suggestion = generate_next_suggestion(history)
         default_placeholder = "Etkinlik sor... (örn: \"Bugün koşu için hava uygun mu?\")"
@@ -405,11 +365,11 @@ def respond_from_history(history, queued, session_id, sessions, username, anon_i
 
     except ValueError as e:
         history[-1]["content"] = f"> ⚠️ {e}"
-        new_sessions = _persist_turn(history, session_id, sessions, user_message, username, anon_id)
+        new_sessions = _persist_turn(history, session_id, sessions, user_message, anon_id)
         yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, new_sessions
     except Exception as e:
         history[-1]["content"] = f"> ⚠️ Bir hata oluştu: {e}"
-        new_sessions = _persist_turn(history, session_id, sessions, user_message, username, anon_id)
+        new_sessions = _persist_turn(history, session_id, sessions, user_message, anon_id)
         yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, new_sessions
 
 
@@ -435,17 +395,17 @@ def clear_chat():
 
 # ---- Session handler'ları ----
 
-def load_sessions_on_start(username, anon_id):
+def load_sessions_on_start(anon_id):
     try:
-        return list_sessions(username, anon_id)
+        return list_sessions(anon_id)
     except Exception:
         return []
 
 
-def on_select_session(sid, username, anon_id):
+def on_select_session(sid, anon_id):
     """Bir session'a tıklanınca sohbeti + hava/harita panelini geri yükler."""
     try:
-        data = load_session(username, anon_id, sid)
+        data = load_session(anon_id, sid)
     except Exception:
         data = None
     if not data:
@@ -487,11 +447,11 @@ def on_select_session(sid, username, anon_id):
     )
 
 
-def on_delete_session(sid, active_id, username, anon_id):
+def on_delete_session(sid, active_id, anon_id):
     """Session'ı siler; silinen aktif session ise sohbeti temizler."""
     try:
-        delete_session(username, anon_id, sid)
-        new_list = list_sessions(username, anon_id)
+        delete_session(anon_id, sid)
+        new_list = list_sessions(anon_id)
     except Exception:
         new_list = []
     if active_id == sid:
@@ -509,10 +469,10 @@ def on_delete_session(sid, active_id, username, anon_id):
     return (new_list, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
 
 
-def on_rename_session(sid, new_title, username, anon_id):
+def on_rename_session(sid, new_title, anon_id):
     try:
-        rename_session(username, anon_id, sid, new_title)
-        new_list = list_sessions(username, anon_id)
+        rename_session(anon_id, sid, new_title)
+        new_list = list_sessions(anon_id)
     except Exception:
         new_list = []
     return new_list, gr.update(visible=False)
@@ -537,16 +497,16 @@ def show_location_on_map(location_names):
     return gr.update(value=map_html, visible=True), gr.update(visible=False)
 
 
-def check_and_show_onboarding(username: str, anon_id: str):
-    """Sayfa yüklenince çalışır. Giriş yapan yeni kullanıcıya onboarding ekranı gösterir.
-    Karşılama HTML'i günceller; butonlar kategori seçeneklerine dönüşür.
-    Anonim ve tercih kayıtlı kullanıcılar için normal görünüm korunur.
+def check_and_show_onboarding(anon_id: str):
+    """Sayfa yüklenince çalışır. Tercihi olmayan (yeni) anonim kullanıcıya onboarding
+    ekranı gösterir. Karşılama HTML'i günceller; butonlar kategori seçeneklerine dönüşür.
+    Tercihi kayıtlı kullanıcılar için normal görünüm korunur.
     Dönüş: (greeting_html, sug1, sug2, sug3, sug4)
     """
     noop = (gr.update(), gr.update(), gr.update(), gr.update(), gr.update())
-    if not username:
+    if not anon_id:
         return noop
-    prefs = get_activity_preferences(username)
+    prefs = get_activity_preferences(anon_id)
     if prefs:
         return noop
     cats = ORNEK_SORULAR
@@ -559,7 +519,7 @@ def check_and_show_onboarding(username: str, anon_id: str):
     )
 
 
-def trigger_preference_update(username: str):
+def trigger_preference_update():
     """'Tercihlerimi Güncelle' — sohbeti temizler ve onboarding ekranını gösterir.
     Dönüş: NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS (15 değer)
     """
@@ -647,19 +607,10 @@ with gr.Blocks(
             </div>
             """,
         )
-        # Giriş yapınca avatar+ad gösteren çip; anonimken gizli kalır (yerelde de gizli).
-        profile_chip = gr.HTML(visible=False, elem_classes="profile-chip")
-        if IS_HF_SPACE:
-            gr.LoginButton(
-                value="HuggingFace ile giriş yap",
-                logout_value="Çıkış yap ({})",
-                elem_classes="login-btn",
-            )
 
     location_state = gr.State("")
     queued_state = gr.State([])
-    # Kullanıcı kimliği ve session state'leri
-    username_state = gr.State("")        # giriş yapan kullanıcı adı; anonimse ""
+    # Anonim kimlik ve session state'leri
     anon_id_box = gr.Textbox(visible=False)  # localStorage anon-id (JS ile dolar)
     session_id_state = gr.State("")      # aktif session id; "" = henüz kaydedilmemiş yeni sohbet
     sessions_state = gr.State([])        # sidebar için session metadata listesi
@@ -688,21 +639,21 @@ with gr.Blocks(
                         rename_save = gr.Button("✓", elem_classes="session-icon", scale=1, min_width=36)
 
                     sel_btn.click(
-                        lambda u, a, _s=sid: on_select_session(_s, u, a),
-                        [username_state, anon_id_box],
+                        lambda a, _s=sid: on_select_session(_s, a),
+                        [anon_id_box],
                         [chatbot, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, session_id_state],
                         api_name=False,
                     )
                     rename_btn.click(lambda: gr.update(visible=True), None, rename_row, api_name=False)
                     rename_save.click(
-                        lambda t, u, a, _s=sid: on_rename_session(_s, t, u, a),
-                        [rename_box, username_state, anon_id_box],
+                        lambda t, a, _s=sid: on_rename_session(_s, t, a),
+                        [rename_box, anon_id_box],
                         [sessions_state, rename_row],
                         api_name=False,
                     )
                     del_btn.click(
-                        lambda act, u, a, _s=sid: on_delete_session(_s, act, u, a),
-                        [session_id_state, username_state, anon_id_box],
+                        lambda act, a, _s=sid: on_delete_session(_s, act, a),
+                        [session_id_state, anon_id_box],
                         [sessions_state, chatbot, empty_state, weather_panel, map_panel, show_loc_btn, location_state, session_id_state],
                         api_name=False,
                     )
@@ -766,7 +717,7 @@ with gr.Blocks(
     )
 
     RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display, session_id_state, sessions_state]
-    RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, username_state, anon_id_box]
+    RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, anon_id_box]
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
     NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot]
 
@@ -794,22 +745,18 @@ with gr.Blocks(
     geo_coords.change(apply_geolocation, geo_coords, [weather_panel, theme_state, sug1, sug2, sug3, sug4], api_name=False)
     ONBOARDING_OUTPUTS = [greeting_html, sug1, sug2, sug3, sug4]
 
-    # Anon-id (JS) → kullanıcı adı (oauth) → session listesi → onboarding kontrolü sırasıyla yüklenir.
+    # Anon-id (JS) → session listesi → onboarding kontrolü sırasıyla yüklenir.
     (demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
-        .then(resolve_account, None, [username_state, profile_chip], api_name=False)
-        .then(load_sessions_on_start, [username_state, anon_id_box], sessions_state, api_name=False)
-        .then(check_and_show_onboarding, [username_state, anon_id_box], ONBOARDING_OUTPUTS, api_name=False))
+        .then(load_sessions_on_start, anon_id_box, sessions_state, api_name=False)
+        .then(check_and_show_onboarding, anon_id_box, ONBOARDING_OUTPUTS, api_name=False))
 
     pref_update_btn.click(
         trigger_preference_update,
-        [username_state],
+        None,
         NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS,
         api_name=False,
     )
 
-
-if IS_HF_SPACE:
-    _inject_oauth_annotation()
 
 if __name__ == "__main__":
     demo.queue(max_size=20)
