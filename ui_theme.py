@@ -655,6 +655,42 @@ footer { display: none !important; }
     letter-spacing: 0.01em;
 }
 
+/* ---- Profil çipi (giriş yapınca avatar + ad) ---- */
+.profile-chip { display: flex; align-items: center; }
+.profile-chip .profile-link { text-decoration: none; }
+.profile-chip .profile-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 4px;
+    background: var(--surface) !important;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.profile-chip .profile-link:hover .profile-inner {
+    border-color: var(--accent);
+    box-shadow: 0 2px 12px var(--glow);
+}
+.profile-chip img,
+.profile-chip .profile-avatar-fallback {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    background: var(--accent-soft, rgba(99,102,241,0.18));
+}
+.profile-chip .profile-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--hero-ink) !important;
+    white-space: nowrap;
+}
+
 /* ---- Hava paneli ---- */
 .panel-col { position: sticky; top: 14px; align-self: flex-start; min-width: 280px; }
 .wx-panel {
@@ -1228,6 +1264,7 @@ button.suggestion-btn:hover {
     .wx-temp { font-size: 50px; }
     .brand { font-size: 1.25rem; }
     .brand-tag { display: none; }
+    .profile-chip .profile-name { display: none; }
     .empty-state { min-height: 360px; }
 }
 """

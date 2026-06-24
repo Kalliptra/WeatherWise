@@ -69,15 +69,42 @@ _abort = threading.Event()
 
 # HF Spaces'te OAuth profile annotasyonunu dinamik ekle.
 # Yerelde session middleware olmadığından annotasyon hata verir; bu yüzden koşullu.
-# Kullanıcı kimliğini tek noktada (resolve_username) çözüp username_state'e yazarız;
+# Kullanıcı kimliğini tek noktada (resolve_account) çözüp username_state'e yazarız;
 # diğer tüm handler'lar username'i normal bir input olarak alır (oauth enjeksiyonu gerekmez).
 def _inject_oauth_annotation():
-    resolve_username.__annotations__["oauth_profile"] = "gr.OAuthProfile | None"
+    resolve_account.__annotations__["oauth_profile"] = "gr.OAuthProfile | None"
 
 
-def resolve_username(oauth_profile=None) -> str:
-    """Giriş yapan kullanıcının adını döndürür; anonimse boş string."""
-    return oauth_profile.preferred_username if oauth_profile else ""
+def resolve_account(oauth_profile=None):
+    """Giriş yapan kullanıcının adını ve profil çipini döndürür.
+
+    Dönüş: (username, profile_chip_update)
+    - Anonim: ("", gizli boş çip)
+    - Girişli: (preferred_username, avatar+ad içeren görünür çip)
+    """
+    if not oauth_profile:
+        return "", gr.update(value="", visible=False)
+
+    username = oauth_profile.preferred_username
+    name = getattr(oauth_profile, "name", None) or username
+    picture = getattr(oauth_profile, "picture", "") or ""
+    profile_url = getattr(oauth_profile, "profile", "") or ""
+
+    avatar = (
+        f"<img src='{picture}' alt='{name}' referrerpolicy='no-referrer'>"
+        if picture
+        else "<span class='profile-avatar-fallback'>👤</span>"
+    )
+    inner = (
+        f"<div class='profile-inner'>{avatar}"
+        f"<span class='profile-name'>{name}</span></div>"
+    )
+    if profile_url:
+        inner = (
+            f"<a class='profile-link' href='{profile_url}' "
+            f"target='_blank' rel='noopener'>{inner}</a>"
+        )
+    return username, gr.update(value=inner, visible=True)
 
 
 # Anonim kullanıcıyı tarayıcı tarafında kalıcı bir kimlikle tanı (localStorage).
@@ -620,8 +647,14 @@ with gr.Blocks(
             </div>
             """,
         )
+        # Giriş yapınca avatar+ad gösteren çip; anonimken gizli kalır (yerelde de gizli).
+        profile_chip = gr.HTML(visible=False, elem_classes="profile-chip")
         if IS_HF_SPACE:
-            gr.LoginButton(elem_classes="login-btn")
+            gr.LoginButton(
+                value="HuggingFace ile giriş yap",
+                logout_value="Çıkış yap ({})",
+                elem_classes="login-btn",
+            )
 
     location_state = gr.State("")
     queued_state = gr.State([])
@@ -763,7 +796,7 @@ with gr.Blocks(
 
     # Anon-id (JS) → kullanıcı adı (oauth) → session listesi → onboarding kontrolü sırasıyla yüklenir.
     (demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
-        .then(resolve_username, None, username_state, api_name=False)
+        .then(resolve_account, None, [username_state, profile_chip], api_name=False)
         .then(load_sessions_on_start, [username_state, anon_id_box], sessions_state, api_name=False)
         .then(check_and_show_onboarding, [username_state, anon_id_box], ONBOARDING_OUTPUTS, api_name=False))
 
