@@ -43,6 +43,7 @@ from tools.memory import (  # noqa: E402
     get_activity_preferences,
     get_personalization_level,
     record_feedback,
+    reset_preferences,
     update_activity_preferences,
 )
 from ui_theme import (  # noqa: E402
@@ -565,7 +566,7 @@ def trigger_preference_reset(anon_id):
     _abort.set()
     if anon_id:
         try:
-            update_activity_preferences(anon_id, [], replace=True)
+            reset_preferences(anon_id)
         except Exception:
             pass
     clear_last_venues()
@@ -703,37 +704,44 @@ def refresh_badge(anon_id):
 
 
 def on_feedback_click(history, anon_id, liked):
-    """Açık 👍/👎 butonu: son öneriye geri bildirim uygular, güncel rozeti döner."""
+    """Açık 👍/👎 butonu: son öneriye geri bildirim uygular, rozeti günceller ve
+    feedback satırını gizler (toast bilgilendirir; yeni öneri gelene kadar görünmez).
+
+    Döner: (pers_badge HTML, feedback_row görünürlük güncellemesi).
+    """
+    hide = gr.update(visible=False)
     lang = get_current_language()
-    if not anon_id:
-        return gr.update()
     content = _last_assistant_content(history)
-    if not content:
-        return gr.update()
+    if not anon_id or not content:
+        return gr.update(), hide
     _process_feedback(anon_id, content, liked, lang)
-    return render_personalization_badge(get_personalization_level(anon_id), lang)
+    return render_personalization_badge(get_personalization_level(anon_id), lang), hide
 
 
 def on_feedback(history, anon_id, evt: gr.LikeData):
-    """Native chatbot 👍/👎 (hover) → ortak feedback işlemini çalıştırır, güncel rozeti döner."""
+    """Native chatbot 👍/👎 (hover) → ortak feedback işlemi, rozet günceli + satırı gizle.
+
+    Döner: (pers_badge HTML, feedback_row görünürlük güncellemesi).
+    """
+    no_change = (gr.update(), gr.update())
     if not anon_id:
-        return gr.update()
+        return no_change
     # evt.index messages modunda ilgili mesajın indeksidir; kullanıcı mesajına veya
     # yazıyor-göstergesine basılan geri bildirimi yoksay.
     idx = evt.index if isinstance(evt.index, int) else (evt.index or [0])[0]
     msgs = history or []
     if not (0 <= idx < len(msgs)):
-        return gr.update()
+        return no_change
     msg = msgs[idx]
     if not isinstance(msg, dict):
-        return gr.update()
+        return no_change
     content = msg.get("content")
     if msg.get("role") != "assistant" or not content or content == TYPING_INDICATOR:
-        return gr.update()
+        return no_change
 
     lang = get_current_language()
     _process_feedback(anon_id, content, bool(evt.liked), lang)
-    return render_personalization_badge(get_personalization_level(anon_id), lang)
+    return render_personalization_badge(get_personalization_level(anon_id), lang), gr.update(visible=False)
 
 
 def apply_geolocation(coords: str, anon_id: str = ""):
@@ -937,10 +945,11 @@ with gr.Blocks(
          .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
 
-    # Native chatbot (hover) 👍/👎 ve açık feedback butonları aynı işlemi paylaşır; ikisi de rozeti günceller.
-    chatbot.like(on_feedback, [chatbot, anon_id_box], pers_badge, api_name=False)
-    fb_like.click(lambda h, a: on_feedback_click(h, a, True), [chatbot, anon_id_box], pers_badge, show_progress="hidden", api_name=False)
-    fb_dislike.click(lambda h, a: on_feedback_click(h, a, False), [chatbot, anon_id_box], pers_badge, show_progress="hidden", api_name=False)
+    # Native chatbot (hover) 👍/👎 ve açık feedback butonları aynı işlemi paylaşır;
+    # ikisi de rozeti günceller ve feedback satırını gizler (yeni öneri gelene kadar).
+    chatbot.like(on_feedback, [chatbot, anon_id_box], [pers_badge, feedback_row], api_name=False)
+    fb_like.click(lambda h, a: on_feedback_click(h, a, True), [chatbot, anon_id_box], [pers_badge, feedback_row], show_progress="hidden", api_name=False)
+    fb_dislike.click(lambda h, a: on_feedback_click(h, a, False), [chatbot, anon_id_box], [pers_badge, feedback_row], show_progress="hidden", api_name=False)
     # Yeni sohbet: panelleri temizle + konumu kullanıcının konumuna döndür, ardından
     # tarayıcı geolocation'ı yeniden çek (gerçekten taşındıysa geo_coords.change tetiklenir).
     (new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)

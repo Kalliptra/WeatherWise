@@ -172,6 +172,23 @@ def update_activity_preferences(
     save_memory(anon_id, memory)
 
 
+def reset_preferences(anon_id: Optional[str]) -> None:
+    """Tüm kişiselleştirme sinyallerini sıfırlar: tercih kategorileri (liked/disliked/notes)
+    ve geri bildirim sayaçları (feedback_count/liked_count/disliked_count).
+
+    'Tercihlerimi Sıfırla' bunu kullanır; kişiselleştirme seviyesi Lv 0'a döner ve
+    onboarding yeniden gösterilir. anon_id yoksa no-op.
+    """
+    if not anon_id:
+        return
+    memory = load_memory(anon_id)
+    memory["preferences"] = {"liked": [], "disliked": [], "notes": ""}
+    memory["feedback_count"] = 0
+    memory["liked_count"] = 0
+    memory["disliked_count"] = 0
+    save_memory(anon_id, memory)
+
+
 def apply_feedback(
     anon_id: Optional[str], assistant_text: str, liked: bool, lang: str = "tr"
 ) -> None:
