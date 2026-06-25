@@ -43,6 +43,10 @@ _TURKISH_WORDS = {
 _current_language: str = "tr"
 _last_locations: list[str] = []
 _user_location: Optional[str] = None  # Kullanıcının bildirdiği güncel konum
+# Son turun gerçek bir aktivite önerisi üretip üretmediği. Netleştirme sorusu,
+# yalnızca-hava ya da konum bildirimi turlarında False; UI feedback satırını
+# (👍/👎) yalnızca True olduğunda gösterir.
+_last_turn_recommended: bool = False
 # Genel/soyut aktivite önerisinde, kullanıcı isterse yakında arama yapması için
 # bekleyen (kategori, şehir). [NEARBY:kategori] işaretinden doldurulur.
 _pending_nearby: tuple[Optional[str], Optional[str]] = (None, None)
@@ -77,6 +81,11 @@ _LOC_UPDATE_PATTERNS = (
 
 def get_last_locations() -> list[str]:
     return list(_last_locations)
+
+
+def did_last_turn_recommend() -> bool:
+    """Son chat_skywise turunun gerçek bir aktivite önerisi üretip üretmediğini döner."""
+    return _last_turn_recommended
 
 
 def clear_last_location() -> None:
@@ -531,6 +540,10 @@ def chat_skywise(messages: list[dict], anon_id: Optional[str] = None) -> Iterato
         [{"role": "user"|"assistant", "content": str}, ...]
     Çıktı: kümülatif metin parçaları (streaming) — son chunk tam yanıttır.
     """
+    # Bu turun öneri durumu sıfırlanır; yalnızca gerçek öneri üretildiğinde True olur.
+    global _last_turn_recommended
+    _last_turn_recommended = False
+
     # Dil tespiti + LangChain mesajlarına dönüşüm (bu _current_language'ı günceller)
     lc_messages = _gradio_to_lc_messages(messages, anon_id=anon_id)
     n_original = len(lc_messages)
@@ -579,6 +592,7 @@ def chat_skywise(messages: list[dict], anon_id: Optional[str] = None) -> Iterato
         worker_text = "Üzgünüm, şu an cevap üretemedim. Tekrar dener misin?"
 
     if _turn_produced_recommendation(new_messages):
+        _last_turn_recommended = True
         try:
             final_text = _supervise_chat_turn(worker_text, new_messages, messages)
         except Exception:

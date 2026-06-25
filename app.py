@@ -28,6 +28,7 @@ from chat import (  # noqa: E402
     chat_skywise,
     clear_last_location,
     clear_pending_nearby,
+    did_last_turn_recommend,
     get_last_locations,
     get_pending_nearby,
     generate_next_suggestion,
@@ -915,7 +916,9 @@ with gr.Blocks(
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
     NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot, time_ribbon, weather_panel, theme_state]
 
-    reveal_feedback = lambda: gr.update(visible=True)
+    # Feedback satırı yalnızca gerçek bir aktivite önerisi yapıldığında görünür;
+    # netleştirme sorusu / yalnızca-hava turlarında gizli kalır.
+    reveal_feedback = lambda: gr.update(visible=did_last_turn_recommend())
     hide_feedback = lambda: gr.update(visible=False)
     for trigger in (textbox.submit, send_btn.click):
         (trigger(pre_submit, [textbox, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
