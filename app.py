@@ -802,14 +802,22 @@ with gr.Blocks(
 
     # Hava durumu (varsayılan şehir) bağımsız/paralel yüklenir — girişleri bloklamaz.
     # Geolocation gerçek konumu uygularsa load_default_city üzerine yazmaz (yarış önlenir).
-    demo.load(load_default_city, None, [weather_panel, theme_state], show_progress="hidden", api_name=False)
+    # Ayrıca güvenlik ağı: Python load'ın `.then`'i güvenilir tetiklenir; anon_id.change
+    # zinciri herhangi bir sebeple çalışmasa bile girişler burada kesin açılır.
+    (demo.load(load_default_city, None, [weather_panel, theme_state], show_progress="hidden", api_name=False)
+        .then(finish_startup, None, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
     demo.load(None, None, geo_coords, js=GEO_JS, api_name=False)
     geo_coords.change(apply_geolocation, [geo_coords, anon_id_box], [weather_panel, theme_state, sug1, sug2, sug3, sug4], show_progress="hidden", api_name=False)
 
     # Giriş kilidi yalnızca hızlı Redis okumalarına bağlıdır: anon-id (JS) → oturum listesi →
     # onboarding kontrolü → girişleri aç. Hava durumu beklenmez (skeleton ile dolar).
-    (demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
-        .then(load_sessions_on_start, anon_id_box, sessions_state, show_progress="hidden", api_name=False)
+    #
+    # Tetikleyici olarak JS load'ın `.then`'i yerine anon_id_box.change kullanılır:
+    # JS-load'dan SONRA `.then` zinciri Gradio 4.44'te güvenilir tetiklenmiyor ve
+    # finish_startup çalışmayınca girişler kilitli kalıyordu. .change ise (geo_coords
+    # ile aynı kanıtlanmış desen) JS değeri set edince güvenilir tetiklenir.
+    demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
+    (anon_id_box.change(load_sessions_on_start, anon_id_box, sessions_state, show_progress="hidden", api_name=False)
         .then(check_and_show_onboarding, anon_id_box, ONBOARDING_OUTPUTS, show_progress="hidden", api_name=False)
         .then(finish_startup, None, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
 
