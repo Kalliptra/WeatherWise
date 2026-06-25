@@ -917,7 +917,7 @@ footer { display: none !important; }
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    color: var(--ink-faint) !important;
+    color: var(--ink-soft) !important;
 }
 .chat-area .message-buttons button:hover,
 .chat-area .icon-button-wrapper button:hover,
