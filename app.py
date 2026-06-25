@@ -346,12 +346,19 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
         if not map_sent:
             locs = get_last_locations()
             if locs:
-                btn_label = (
-                    f"📍 {locs[0]} konumunu haritada göster"
-                    if len(locs) == 1
-                    else f"📍 Bunları haritada göster ({len(locs)} yer)"
-                )
-                yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), locs, gr.update(), remaining, qd, session_id, sessions
+                # Önerilen yerleri doğrudan haritada göster (butona gerek kalmadan).
+                map_html = _locations_to_map_html(locs)
+                if map_html:
+                    yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), locs, gr.update(), remaining, qd, session_id, sessions
+                    map_sent = True
+                else:
+                    # Geocode başarısızsa buton fallback'i göster.
+                    btn_label = (
+                        f"📍 {locs[0]} konumunu haritada göster"
+                        if len(locs) == 1
+                        else f"📍 Bunları haritada göster ({len(locs)} yer)"
+                    )
+                    yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), locs, gr.update(), remaining, qd, session_id, sessions
 
         new_sessions = _persist_turn(history, session_id, sessions, user_message, anon_id)
 
@@ -488,10 +495,11 @@ def on_rename_session(sid, new_title, anon_id):
     return new_list, gr.update(visible=False)
 
 
-def show_location_on_map(location_names):
-    """Lokasyon adlarını geocode edip haritada gösterir (tek veya çok)."""
+def _locations_to_map_html(location_names) -> str:
+    """Lokasyon adlarını geocode edip harita HTML'i üretir. Hiçbiri geocode
+    edilemezse "" döner."""
     if not location_names:
-        return gr.update(), gr.update(visible=False)
+        return ""
     if isinstance(location_names, str):
         location_names = [location_names]
     coords = []
@@ -502,8 +510,15 @@ def show_location_on_map(location_names):
         except Exception:
             continue
     if not coords:
+        return ""
+    return render_locations_map(coords)
+
+
+def show_location_on_map(location_names):
+    """Lokasyon adlarını geocode edip haritada gösterir (tek veya çok)."""
+    map_html = _locations_to_map_html(location_names)
+    if not map_html:
         return gr.update(), gr.update(visible=False)
-    map_html = render_locations_map(coords)
     return gr.update(value=map_html, visible=True), gr.update(visible=False)
 
 
@@ -529,11 +544,17 @@ def check_and_show_onboarding(anon_id: str):
     )
 
 
-def trigger_preference_update():
-    """'Tercihlerimi Güncelle' — sohbeti temizler ve onboarding ekranını gösterir.
+def trigger_preference_reset(anon_id):
+    """'Tercihlerimi Sıfırla' — kayıtlı aktivite tercihlerini siler, sohbeti
+    temizler ve onboarding ekranını yeniden gösterir.
     Dönüş: NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS (15 değer)
     """
     _abort.set()
+    if anon_id:
+        try:
+            update_activity_preferences(anon_id, [], replace=True)
+        except Exception:
+            pass
     clear_last_venues()
     clear_last_location()
     clear_last_forecast()
@@ -665,7 +686,7 @@ with gr.Blocks(
     with gr.Row(elem_classes="main-row"):
         with gr.Column(scale=1, min_width=200, elem_classes="session-sidebar", visible=True) as sidebar_col:
             new_chat_btn = gr.Button("➕ Yeni Sohbet", elem_classes="new-chat-btn")
-            pref_update_btn = gr.Button("⚙️ Tercihlerimi Güncelle", elem_classes="new-chat-btn", size="sm")
+            pref_update_btn = gr.Button("🔄 Tercihlerimi Sıfırla", elem_classes="new-chat-btn", size="sm")
 
             @gr.render(inputs=[sessions_state, session_id_state])
             def render_sessions(sessions, active_id):
@@ -827,8 +848,8 @@ with gr.Blocks(
         .then(finish_startup, None, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
 
     pref_update_btn.click(
-        trigger_preference_update,
-        None,
+        trigger_preference_reset,
+        anon_id_box,
         NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS,
         show_progress="hidden",
         api_name=False,

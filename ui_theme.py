@@ -1092,6 +1092,48 @@ button.session-icon:hover, .session-icon button:hover {
     background: var(--surface-strong) !important;
 }
 
+/* Sohbet adı düzenleme alanı — dar sidebar'da dikey yerleşim + okunur input/buton */
+.session-rename-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    width: 100% !important;
+    padding: 6px !important;
+    margin: 2px 0 !important;
+    background: var(--surface-hover) !important;
+    border-radius: 10px !important;
+}
+.session-rename-row textarea,
+.session-rename-row input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 38px !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+    color: var(--ink) !important;
+    background: var(--surface-strong) !important;
+    border: 1px solid var(--accent) !important;
+    border-radius: 8px !important;
+    padding: 8px 10px !important;
+    resize: none !important;
+}
+.session-rename-row button.session-icon,
+.session-rename-row .session-icon button {
+    align-self: flex-end !important;
+    opacity: 1 !important;
+    color: #fff !important;
+    background: var(--accent) !important;
+    border-radius: 8px !important;
+    padding: 6px 16px !important;
+    min-width: 48px !important;
+    font-size: 1rem !important;
+}
+.session-rename-row button.session-icon:hover,
+.session-rename-row .session-icon button:hover {
+    background: var(--accent-strong, var(--accent)) !important;
+    color: #fff !important;
+}
+
 /* ---- Sırada bekleyen mesajlar ---- */
 .queued-display-wrapper { padding: 4px 0 0; }
 .queued-display { display: flex; flex-direction: column; gap: 6px; }
