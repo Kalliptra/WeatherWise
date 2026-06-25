@@ -671,13 +671,14 @@ def update_time_ribbon():
 
 
 def _process_feedback(anon_id, content, liked, lang):
-    """Geri bildirim ortak işlemi: anlık sayaç + arka planda kategori çıkarımı + toast."""
-    record_feedback(anon_id, liked)  # senkron, hızlı — rozet hemen yansısın
-    threading.Thread(
-        target=apply_feedback,
-        args=(anon_id, content, bool(liked), lang),
-        daemon=True,
-    ).start()
+    """Geri bildirim ortak işlemi: sayaç + kategori çıkarımı (senkron) + toast.
+
+    Kategori taşıma (apply_feedback) senkron yapılır ki hemen ardından render edilen
+    kart güncel liked/disliked'i yansıtsın — aksi halde 👎, eski liked kategorileri
+    yüzünden 'like' gibi görünüyordu.
+    """
+    record_feedback(anon_id, liked)  # sayaç (feedback_count) → seviye
+    apply_feedback(anon_id, content, bool(liked), lang)  # kategori taşıma → kart listesi
     if liked:
         gr.Info("Tercihin kaydedildi 👍 — bunu daha sık öneririm" if lang != "en"
                 else "Noted 👍 — I'll suggest this more")

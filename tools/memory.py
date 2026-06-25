@@ -166,9 +166,14 @@ def update_activity_preferences(
     if replace:
         prefs["liked"] = [c for c in categories if c]
     else:
+        added = False
         for cat in categories:
             if cat and cat not in prefs["liked"]:
                 prefs["liked"].append(cat)
+                added = True
+        # Onboarding kategori seçimi = bir geri bildirim aksiyonu (buton başına +1).
+        if added:
+            memory["feedback_count"] = int(memory.get("feedback_count", 0)) + 1
     save_memory(anon_id, memory)
 
 
@@ -254,18 +259,17 @@ def apply_feedback(
 
 
 def _level_from(count: int, prefs: dict) -> dict:
-    """Geri bildirim sayısı + kategori çeşitliliğinden seviye sözlüğü üretir.
+    """Verilen geri bildirim sayısından (`count`) seviye sözlüğü üretir.
 
-    `count` (açık 👍/👎 sayısı) anlık güncellenen birincil sinyaldir; kategori
-    çeşitliliği (liked+disliked) tabanı yükseltir, böylece onboarding sonrası
-    rozet 0'da kalmaz. Seviye 1-5, ilerleme 0-100 arasıdır.
+    Seviye yalnızca aksiyon sayısına bağlıdır: her 👍/👎 (ve onboarding kategori
+    seçimi) `count`'u +1 yapar → seviye öngörülebilir biçimde artar, tek tıkta
+    sıçramaz. `liked`/`disliked` listeleri kart için ayrıca döndürülür.
+    Seviye 0-5, ilerleme 0-100 arasıdır.
     """
     liked = prefs.get("liked", []) if prefs else []
     disliked = prefs.get("disliked", []) if prefs else []
-    diversity = len(liked) + len(disliked)
-    score = max(count, diversity)
-    level = min(5, 1 + score // 2) if score else 0
-    pct = min(100, score * 20)
+    level = min(5, max(0, count))
+    pct = min(100, max(0, count) * 20)
     return {
         "count": count,
         "level": level,

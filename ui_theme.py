@@ -426,49 +426,59 @@ def render_panel_skeleton() -> str:
     )
 
 
+def _fmt_pref_list(items: list[str], limit: int = 6) -> str:
+    """Tür listesini virgüllü metne çevirir; fazlasını '+N' ile özetler."""
+    clean = [str(c).strip() for c in items if str(c).strip()]
+    shown = clean[:limit]
+    text = ", ".join(_html.escape(c) for c in shown)
+    extra = len(clean) - len(shown)
+    if extra > 0:
+        text += f" +{extra}"
+    return text
+
+
 def render_personalization_badge(level_info: dict, lang: str = "tr") -> str:
-    """Sidebar kişiselleştirme seviyesi rozeti: 5 noktalı gösterge + Lv N + tek satır açıklama."""
+    """Sidebar kişiselleştirme kartı: Lv N + 5 nokta + beğenilen/beğenilmeyen türler (isimle)."""
     info = level_info or {}
     level = int(info.get("level", 0))
     liked = info.get("liked", []) or []
     disliked = info.get("disliked", []) or []
 
+    title = "Kişiselleştirme" if lang != "en" else "Personalization"
+    lvl_label = f"Lv {level}"
     dots = "".join(
         f'<span class="pb-dot{" on" if i < level else ""}"></span>' for i in range(5)
     )
 
-    if level <= 0:
-        title = "Kişiselleştirme" if lang != "en" else "Personalization"
-        desc = ("Öneriler ver/beğen, sana göre şekillensin"
-                if lang != "en" else "Give feedback to tailor suggestions")
-        lvl_label = "Lv 0"
-    else:
-        title = "Kişiselleştirme" if lang != "en" else "Personalization"
-        lvl_label = f"Lv {level}"
-        if lang == "en":
-            parts = []
-            if liked:
-                parts.append(f"{len(liked)} liked")
-            if disliked:
-                parts.append(f"{len(disliked)} disliked")
-            stat = ", ".join(parts) if parts else "learning"
-            desc = f"{stat} — suggestions are shaped for you"
+    body_lines: list[str] = []
+    if liked:
+        lbl = "Liked" if lang == "en" else "Sevdiklerin"
+        body_lines.append(
+            f'<div class="pb-likes"><span class="pb-tag">{lbl}:</span> {_fmt_pref_list(liked)}</div>'
+        )
+    if disliked:
+        lbl = "Disliked" if lang == "en" else "Sevmediklerin"
+        body_lines.append(
+            f'<div class="pb-dislikes"><span class="pb-tag">{lbl}:</span> {_fmt_pref_list(disliked)}</div>'
+        )
+
+    if not body_lines:
+        if level > 0:
+            # Aksiyon var ama henüz tür çıkarılamadı.
+            msg = ("learning — suggestions are shaped for you"
+                   if lang == "en" else "öğreniyor — öneriler sana göre şekilleniyor")
         else:
-            parts = []
-            if liked:
-                parts.append(f"{len(liked)} beğeni")
-            if disliked:
-                parts.append(f"{len(disliked)} beğenmeme")
-            stat = ", ".join(parts) if parts else "öğreniyor"
-            desc = f"{stat} — öneriler sana göre şekilleniyor"
+            msg = ("Give feedback to tailor suggestions"
+                   if lang == "en" else "Öneri ver ve beğen, sana göre şekillensin")
+        body_lines.append(f'<div class="pb-desc">{msg}</div>')
 
     return (
         '<div class="pers-badge-inner">'
         f'<div class="pb-head"><span class="pb-title">{title}</span>'
         f'<span class="pb-lvl">{lvl_label}</span></div>'
         f'<div class="pb-dots">{dots}</div>'
-        f'<div class="pb-desc">{desc}</div>'
-        "</div>"
+        + "".join(body_lines)
+        + "</div>"
     )
 
 
@@ -1215,6 +1225,20 @@ button.new-chat-btn:hover, .new-chat-btn button:hover {
     color: var(--ink-soft);
     opacity: 0.9;
 }
+.pers-badge-inner .pb-likes,
+.pers-badge-inner .pb-dislikes {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--ink);
+    word-break: break-word;
+}
+.pers-badge-inner .pb-dislikes { color: var(--ink-soft); opacity: 0.85; }
+.pers-badge-inner .pb-tag {
+    font-weight: 700;
+    color: var(--accent);
+    margin-right: 2px;
+}
+.pers-badge-inner .pb-dislikes .pb-tag { color: var(--ink-soft); }
 
 /* Açık öneri geri bildirim satırı (👍/👎) — sohbet ile giriş arasında */
 .feedback-row {
