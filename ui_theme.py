@@ -832,6 +832,63 @@ footer { display: none !important; }
 .chat-area button.action:hover { color: var(--ink) !important; }
 .chat-area button svg { color: inherit !important; opacity: 0.85; }
 
+/* ===== Güncel Gradio 5 baloncuk yapısı =====
+   Yeni sürümlerde rol class'ı (.user/.bot) artık .flex-wrap'te değil;
+   satır .message-row.{role}-row, asıl balon ise .message elementinde.
+   Bu blok yukarıdaki .flex-wrap.user/.bot kurallarından SONRA gelir ve
+   daha yüksek özgüllükle (.user-row .message) kazanır. */
+.chat-area .message-row,
+.chat-area .message-row .flex-wrap {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+/* Asıl balon = .message (rol satırdan miras alınır) */
+.chat-area .user-row .message,
+.chat-area .bot-row .message {
+    padding: 11px 15px !important;
+}
+.chat-area .user-row .message {
+    background: linear-gradient(150deg, var(--accent), var(--accent-strong)) !important;
+    border: none !important;
+    border-radius: 16px 16px 4px 16px !important;
+    box-shadow: 0 10px 26px var(--glow) !important;
+    font-weight: 600 !important;
+}
+.chat-area .bot-row .message {
+    background: var(--surface-strong) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 16px 16px 16px 4px !important;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.30) !important;
+}
+/* Balon içi metin renkleri */
+.chat-area .user-row .message,
+.chat-area .user-row .message * { color: var(--on-accent) !important; }
+.chat-area .bot-row .message,
+.chat-area .bot-row .message p,
+.chat-area .bot-row .message li,
+.chat-area .bot-row .message strong,
+.chat-area .bot-row .message h1,
+.chat-area .bot-row .message h2,
+.chat-area .bot-row .message h3 { color: var(--ink) !important; }
+.chat-area .bot-row .message em { color: var(--accent) !important; }
+.chat-area .bot-row .message a { color: var(--accent) !important; font-weight: 600; }
+.chat-area .bot-row .message code {
+    background: rgba(0, 0, 0, 0.28) !important;
+    color: #d6def5 !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 6px !important;
+    padding: 1px 6px !important;
+    font-size: 0.9em;
+}
+.chat-area .bot-row .message hr {
+    border: none !important;
+    border-top: 1px solid var(--line) !important;
+    margin: 12px 0 !important;
+    background: transparent !important;
+}
+
 /* ---- Giriş alanı ---- */
 .chat-input-row {
     margin-top: 12px !important;
