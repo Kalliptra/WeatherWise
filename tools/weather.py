@@ -73,6 +73,21 @@ def _parse_current(data: dict) -> dict:
     return weather
 
 
+def _fetch_owm(params: dict) -> dict:
+    """OWM anlık hava endpoint'ine GET atıp ham JSON döndürür.
+    `params` üzerine appid/units eklenir. 404 → ValueError, diğer hata → ConnectionError.
+    """
+    response = requests.get(
+        BASE_URL,
+        params={**params, "appid": WEATHER_API_KEY, "units": "metric"},
+    )
+    if response.status_code == 404:
+        raise ValueError("Konum bulunamadı")
+    if response.status_code != 200:
+        raise ConnectionError(f"Hava durumu verisi alınamadı. HTTP {response.status_code}")
+    return response.json()
+
+
 def get_weather(city: str, lang: str = "tr") -> dict:
     """
     Given a city name, returns a dict with weather details.
@@ -84,18 +99,26 @@ def get_weather(city: str, lang: str = "tr") -> dict:
     today = datetime.now().strftime("%Y-%m-%d")
 
     def _fetch():
-        params = {
-            "q": city,
-            "appid": WEATHER_API_KEY,
-            "units": "metric",
-            "lang": lang,
-        }
-        response = requests.get(BASE_URL, params=params)
-        if response.status_code == 404:
-            raise ValueError(f"Şehir bulunamadı: {city}")
-        if response.status_code != 200:
-            raise ConnectionError(f"Hava durumu verisi alınamadı. HTTP {response.status_code}")
-        return _parse_current(response.json())
+        # Önce Nominatim ile geocode et: OWM'in q=city isim araması, "Beşiktaş" gibi
+        # ilçe adlarını yanlış (ör. Doğu Anadolu'daki başka bir Beşiktaş) yere
+        # çözüyor. Geocode başarılıysa koordinatla çek; başarısızsa eski isim
+        # aramasına düş (geriye dönük güvenli fallback).
+        display_name = None
+        try:
+            from tools.venue import geocode_city
+
+            lat, lon = geocode_city(city)
+            data = _fetch_owm({"lat": lat, "lon": lon, "lang": lang})
+            # Koordinatla çekince OWM en yakın büyük şehir adını döndürür
+            # (Beşiktaş→"İstanbul"); kullanıcının sorduğu yeri koru.
+            display_name = city.strip().title()
+        except (ValueError, ConnectionError):
+            data = _fetch_owm({"q": city, "lang": lang})
+
+        weather = _parse_current(data)
+        if display_name:
+            weather["city"] = display_name
+        return weather
 
     return _remember(get_or_fetch(("weather", city.lower(), today), _fetch))
 
@@ -105,20 +128,7 @@ def get_weather_by_coords(lat: float, lon: float) -> dict:
     Returns the same schema as get_weather() for the given coordinates.
     Used only by the UI startup path (geolocation); bypasses the eval provider seam.
     """
-    params = {
-        "lat": lat,
-        "lon": lon,
-        "appid": WEATHER_API_KEY,
-        "units": "metric",
-        "lang": "tr",
-    }
-
-    response = requests.get(BASE_URL, params=params)
-
-    if response.status_code != 200:
-        raise ConnectionError(f"Hava durumu verisi alınamadı. HTTP {response.status_code}")
-
-    return _remember(_parse_current(response.json()))
+    return _remember(_parse_current(_fetch_owm({"lat": lat, "lon": lon, "lang": "tr"})))
 
 
 def get_forecast(city: str, days: int = 3, lang: str = "tr") -> str:
