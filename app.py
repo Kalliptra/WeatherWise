@@ -391,11 +391,15 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
 
 
 def clear_chat():
-    """'Yeni Sohbet' — sohbeti ve panelleri temizler, aktif session id'yi sıfırlar."""
+    """'Yeni Sohbet' — sohbeti ve panelleri temizler, aktif session id'yi sıfırlar.
+    Hava panelini kullanıcının algılanan konumuna döndürür (önceki sohbette başka bir
+    şehre bakılmış olabilir)."""
     _abort.set()
     clear_last_venues()
     clear_last_location()
     clear_last_forecast()
+    clear_last_weather()
+    weather_panel, theme = _location_weather_panel()
     return (
         gr.update(value=[], visible=False),
         gr.update(visible=True),
@@ -407,6 +411,8 @@ def clear_chat():
         "",
         "",
         gr.update(visible=False),
+        weather_panel,
+        theme,
     )
 
 
@@ -558,7 +564,9 @@ def trigger_preference_reset(anon_id):
     clear_last_venues()
     clear_last_location()
     clear_last_forecast()
+    clear_last_weather()
     cats = ORNEK_SORULAR
+    weather_panel, theme = _location_weather_panel()
     return (
         gr.update(value=[], visible=False),   # chatbot
         gr.update(visible=True),               # empty_state
@@ -570,6 +578,8 @@ def trigger_preference_reset(anon_id):
         "",                                    # queued_display
         "",                                    # session_id_state
         gr.update(visible=False),              # forecast_plot
+        weather_panel,                         # weather_panel
+        theme,                                 # theme_state
         gr.update(value=ONBOARDING_HTML),      # greeting_html
         gr.update(value=cats[0]),              # sug1
         gr.update(value=cats[1]),              # sug2
@@ -587,6 +597,18 @@ def load_default_city():
         return render_weather_panel(weather), weather_to_theme(weather)
     except Exception:
         return render_panel_placeholder("Hava durumu alınamadı."), "clear-day"
+
+
+def _location_weather_panel():
+    """Kullanıcının algılanan konumuna (yoksa varsayılan şehre) göre hava panelini
+    yeniden üretir. Yeni sohbet/tercih sıfırlama sırasında paneli kullanıcının kendi
+    konumuna döndürmek için kullanılır. Dönüş: (weather_panel, theme_state)."""
+    city = get_user_location() or DEFAULT_CITY
+    try:
+        weather = get_weather(city)
+        return render_weather_panel(weather), weather_to_theme(weather)
+    except Exception:
+        return gr.update(), gr.update()
 
 
 DEFAULT_PLACEHOLDER = "Etkinlik sor... (örn: \"Bugün koşu için hava uygun mu?\")"
@@ -798,7 +820,7 @@ with gr.Blocks(
     RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display, session_id_state, sessions_state]
     RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, anon_id_box]
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
-    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot]
+    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot, weather_panel, theme_state]
 
     for trigger in (textbox.submit, send_btn.click):
         (trigger(pre_submit, [textbox, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
@@ -812,7 +834,10 @@ with gr.Blocks(
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
          .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
-    new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
+    # Yeni sohbet: panelleri temizle + konumu kullanıcının konumuna döndür, ardından
+    # tarayıcı geolocation'ı yeniden çek (gerçekten taşındıysa geo_coords.change tetiklenir).
+    (new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
+        .then(None, None, geo_coords, js=GEO_JS, api_name=False))
     show_loc_btn.click(show_location_on_map, location_state, [map_panel, show_loc_btn], show_progress="hidden", api_name=False)
 
     toggle_sidebar_btn.click(
