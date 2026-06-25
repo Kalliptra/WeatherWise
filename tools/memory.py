@@ -172,6 +172,70 @@ def update_activity_preferences(
     save_memory(anon_id, memory)
 
 
+def apply_feedback(
+    anon_id: Optional[str], assistant_text: str, liked: bool, lang: str = "tr"
+) -> None:
+    """Bir öneri mesajına verilen 👍/👎 geri bildirimini hafızaya işler.
+
+    assistant_text'ten ana aktivite kategorilerini LLM ile çıkarır:
+    - liked=True  → kategoriler "liked"e taşınır, "disliked"ten çıkarılır.
+    - liked=False → kategoriler "disliked"e taşınır, "liked"ten çıkarılır.
+
+    anon_id yoksa no-op. Hata durumunda sessizce çıkar. Arka plan thread'inde çağrılmalı.
+    """
+    if not anon_id or not (assistant_text or "").strip():
+        return
+
+    try:
+        from langchain_core.messages import HumanMessage, SystemMessage
+        from core.llms import evaluator_llm
+
+        if lang == "en":
+            sys_content = (
+                "Extract the main activity categories from the assistant message below "
+                "(e.g. running, museum, cafe, hiking, beach, sports). Return only this JSON:\n"
+                '{"categories": ["category", ...]}\n'
+                "Use short, general category names. Return at most 3. Nothing else."
+            )
+        else:
+            sys_content = (
+                "Aşağıdaki asistan mesajından ana aktivite kategorilerini çıkar "
+                "(örn. koşu, müze, kafe, yürüyüş, plaj, spor). Yalnızca şu JSON'u döndür:\n"
+                '{"categories": ["kategori", ...]}\n'
+                "Kısa, genel kategori adları kullan. En fazla 3 tane. Başka hiçbir şey yazma."
+            )
+
+        raw = evaluator_llm.invoke([
+            SystemMessage(content=sys_content),
+            HumanMessage(content=assistant_text[:1500]),
+        ]).content.strip()
+
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start == -1 or end == 0:
+            return
+        categories = [c for c in json.loads(raw[start:end]).get("categories", []) if c]
+        if not categories:
+            return
+
+        memory = load_memory(anon_id)
+        prefs = memory.setdefault("preferences", {"liked": [], "disliked": [], "notes": ""})
+        prefs.setdefault("liked", [])
+        prefs.setdefault("disliked", [])
+
+        add_to, remove_from = ("liked", "disliked") if liked else ("disliked", "liked")
+        for cat in categories:
+            prefs[remove_from] = [c for c in prefs[remove_from] if c != cat]
+            if cat not in prefs[add_to]:
+                prefs[add_to].append(cat)
+
+        memory["language"] = lang
+        save_memory(anon_id, memory)
+
+    except Exception:
+        pass
+
+
 def extract_and_update(
     messages: list[dict],
     city: Optional[str],

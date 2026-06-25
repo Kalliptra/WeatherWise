@@ -35,17 +35,22 @@ from chat import (  # noqa: E402
     get_user_location,
     set_user_location,
 )
-from tools.memory import get_activity_preferences, update_activity_preferences  # noqa: E402
+from tools.memory import (  # noqa: E402
+    apply_feedback,
+    get_activity_preferences,
+    update_activity_preferences,
+)
 from ui_theme import (  # noqa: E402
     CUSTOM_CSS,
     render_locations_map,
     render_map_panel,
     render_panel_placeholder,
     render_panel_skeleton,
+    render_time_ribbon,
     render_weather_panel,
     weather_to_theme,
 )
-from tools.forecast import clear_last_forecast  # noqa: E402
+from tools.forecast import clear_last_forecast, get_last_forecast  # noqa: E402
 from tools.weather import (  # noqa: E402
     clear_last_weather,
     get_last_weather,
@@ -411,6 +416,7 @@ def clear_chat():
         "",
         "",
         gr.update(visible=False),
+        gr.update(value="", visible=False),
         weather_panel,
         theme,
     )
@@ -578,6 +584,7 @@ def trigger_preference_reset(anon_id):
         "",                                    # queued_display
         "",                                    # session_id_state
         gr.update(visible=False),              # forecast_plot
+        gr.update(value="", visible=False),    # time_ribbon
         weather_panel,                         # weather_panel
         theme,                                 # theme_state
         gr.update(value=ONBOARDING_HTML),      # greeting_html
@@ -648,6 +655,49 @@ def update_forecast_chart():
     if fig is None:
         return gr.update(visible=False)
     return gr.update(value=fig, visible=True)
+
+
+def update_time_ribbon():
+    """Bu turda çekilen saatlik tahminden 'en iyi saat' şeridini üretir (yoksa gizler)."""
+    try:
+        html = render_time_ribbon(get_last_forecast(), lang=get_current_language())
+    except Exception:
+        html = None
+    if not html:
+        return gr.update(value="", visible=False)
+    return gr.update(value=html, visible=True)
+
+
+def on_feedback(history, anon_id, evt: gr.LikeData):
+    """Bir öneri mesajına 👍/👎 → hafızayı arka planda günceller, toast gösterir."""
+    if not anon_id:
+        return
+    # evt.index messages modunda ilgili mesajın indeksidir; kullanıcı mesajına veya
+    # yazıyor-göstergesine basılan geri bildirimi yoksay.
+    idx = evt.index if isinstance(evt.index, int) else (evt.index or [0])[0]
+    msgs = history or []
+    if not (0 <= idx < len(msgs)):
+        return
+    msg = msgs[idx]
+    if not isinstance(msg, dict):
+        return
+    content = msg.get("content")
+    if msg.get("role") != "assistant" or not content or content == TYPING_INDICATOR:
+        return
+
+    lang = get_current_language()
+    threading.Thread(
+        target=apply_feedback,
+        args=(anon_id, content, bool(evt.liked), lang),
+        daemon=True,
+    ).start()
+
+    if evt.liked:
+        gr.Info("Tercihin kaydedildi 👍 — bunu daha sık öneririm" if lang != "en"
+                else "Noted 👍 — I'll suggest this more")
+    else:
+        gr.Info("Anlaşıldı 👎 — bunu bir daha pek önermem" if lang != "en"
+                else "Got it 👎 — I'll avoid this from now on")
 
 
 def apply_geolocation(coords: str, anon_id: str = ""):
@@ -752,6 +802,7 @@ with gr.Blocks(
 
         with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
             weather_panel = gr.HTML(render_panel_skeleton())
+            time_ribbon = gr.HTML(value="", visible=False, elem_classes="time-ribbon-wrap")
             forecast_plot = gr.Plot(visible=False, elem_classes="forecast-plot", show_label=False)
             map_panel = gr.HTML(value="", visible=False)
             show_loc_btn = gr.Button("📍 Konumu Haritada Göster", visible=False, elem_classes="loc-btn")
@@ -820,20 +871,24 @@ with gr.Blocks(
     RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display, session_id_state, sessions_state]
     RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, anon_id_box]
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
-    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot, weather_panel, theme_state]
+    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot, time_ribbon, weather_panel, theme_state]
 
     for trigger in (textbox.submit, send_btn.click):
         (trigger(pre_submit, [textbox, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
          .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
          .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
+         .then(update_time_ribbon, None, time_ribbon, show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
     for sug in (sug1, sug2, sug3, sug4):
         (sug.click(pre_submit, [sug, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
          .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
          .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
+         .then(update_time_ribbon, None, time_ribbon, show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
+
+    chatbot.like(on_feedback, [chatbot, anon_id_box], None, api_name=False)
     # Yeni sohbet: panelleri temizle + konumu kullanıcının konumuna döndür, ardından
     # tarayıcı geolocation'ı yeniden çek (gerçekten taşındıysa geo_coords.change tetiklenir).
     (new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)

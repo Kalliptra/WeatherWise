@@ -514,6 +514,75 @@ def render_forecast_chart(forecast: dict, horizon: int = 48):
     return fig
 
 
+def render_time_ribbon(forecast: dict, lang: str = "tr"):
+    """Bugünün kalan saatlerini açık-hava uygunluğuna göre boyayan kompakt şerit.
+
+    `tools.forecast.classify_today_hours()` çıktısından HTML üretir: her saat bir hücre
+    (yeşil=ideal, sarı=UV, mavi=yağış, kırmızı=sıcak, mor=soğuk), üstte en uzun ideal
+    pencere özeti. Veri yetersizse None döner (şerit gizli kalır).
+    """
+    if not forecast:
+        return None
+    from tools.forecast import classify_today_hours
+
+    cells = classify_today_hours(forecast)
+    if len(cells) < 2:
+        return None
+
+    # En uzun ardışık "good" (ideal açık hava) penceresini bul
+    best_start = best_len = cur_start = cur_len = 0
+    for i, c in enumerate(cells):
+        if c["state"] == "good":
+            if cur_len == 0:
+                cur_start = i
+            cur_len += 1
+            if cur_len > best_len:
+                best_len, best_start = cur_len, cur_start
+        else:
+            cur_len = 0
+
+    if best_len >= 1:
+        a = cells[best_start]["hour"]
+        end_hour = cells[best_start + best_len - 1]["hour"]
+        b = "23:59" if end_hour >= 23 else f"{end_hour + 1:02d}:00"
+        if lang == "en":
+            summary = f"🟢 Best window: {a:02d}:00–{b}"
+        else:
+            summary = f"🟢 En iyi saat: {a:02d}:00–{b}"
+    else:
+        summary = (
+            "No ideal outdoor window today"
+            if lang == "en"
+            else "Bugün açık hava için ideal pencere görünmüyor"
+        )
+
+    # Her ~3 saatte bir etiket göster (ilk hücre dahil)
+    cell_html = []
+    for i, c in enumerate(cells):
+        label = f"{c['hour']:02d}" if (i == 0 or c["hour"] % 3 == 0) else ""
+        cell_html.append(
+            f'<span class="tr-cell tr-cell--{c["state"]}" title="{c["hour"]:02d}:00">'
+            f'<span class="tr-label">{label}</span></span>'
+        )
+
+    rain_word = "rain" if lang == "en" else "yağış"
+    legend = (
+        '<div class="tr-legend">'
+        '<span class="tr-dot tr-cell--good"></span>ideal'
+        '<span class="tr-dot tr-cell--uv"></span>UV'
+        f'<span class="tr-dot tr-cell--rain"></span>{rain_word}'
+        "</div>"
+    )
+
+    return (
+        '<div class="time-ribbon">'
+        f'<div class="tr-summary">{summary}</div>'
+        f'<div class="tr-track">{"".join(cell_html)}</div>'
+        f"{legend}"
+        "</div>"
+    )
+
+
 # ---- CSS -------------------------------------------------------------------
 
 CUSTOM_CSS = """
@@ -1228,6 +1297,64 @@ button.suggestion-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 14px 30px var(--glow) !important;
 }
+
+/* ---- "En iyi saat" şeridi ---- */
+.time-ribbon {
+    margin-top: 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    padding: 12px 14px;
+}
+.tr-summary {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 9px;
+}
+.tr-track {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+}
+.tr-cell {
+    flex: 1 1 0;
+    height: 26px;
+    border-radius: 4px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+}
+.tr-label {
+    font-size: 9px;
+    color: var(--ink-faint);
+    position: absolute;
+    bottom: -15px;
+    white-space: nowrap;
+}
+.tr-track { margin-bottom: 16px; }
+.tr-cell--good { background: rgba(74,222,128,0.55); }
+.tr-cell--uv   { background: rgba(251,191,36,0.6); }
+.tr-cell--rain { background: rgba(96,165,250,0.6); }
+.tr-cell--hot  { background: rgba(248,113,113,0.6); }
+.tr-cell--cold { background: rgba(167,139,250,0.6); }
+.tr-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-top: 6px;
+}
+.tr-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    display: inline-block;
+    margin-left: 10px;
+}
+.tr-legend .tr-dot:first-child { margin-left: 0; }
 
 /* ---- Tahmin grafiği ---- */
 .forecast-plot {

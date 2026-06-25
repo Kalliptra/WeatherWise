@@ -266,6 +266,30 @@ def summarize_timing(forecast: dict, lang: str = "tr") -> str:
     return " ".join(parts)
 
 
+def classify_today_hours(forecast: dict) -> list[dict]:
+    """Bugünün kalan saatlerini görsel şerit için durum etiketiyle döndürür.
+
+    Her saat için {"hour": int, "temp": float, "uv": float, "state": str} döner.
+    state ∈ {"rain", "cold", "hot", "uv", "good"} — yağmur + UV + sıcaklık birlikte
+    değerlendirilir; "good" açık hava için ideal saati işaret eder.
+    """
+    hours = forecast.get("hours") or []
+    out: list[dict] = []
+    for h in _today_upcoming(hours):
+        if h["is_rainy"]:
+            state = "rain"
+        elif h["temp"] <= 0:
+            state = "cold"
+        elif h["temp"] >= 38:
+            state = "hot"
+        elif h["uv"] >= 6:
+            state = "uv"
+        else:
+            state = "good"
+        out.append({"hour": h["hour"], "temp": h["temp"], "uv": h["uv"], "state": state})
+    return out
+
+
 def summarize_days(forecast: dict, lang: str = "tr") -> str:
     """Gün-gün özet metni (çok günlü plan için)."""
     days = forecast.get("days") or []
