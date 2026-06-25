@@ -820,8 +820,14 @@ footer { display: none !important; }
 }
 
 /* Kopyala / aksiyon ikon butonları: sade, çerçevesiz */
-.chat-area .message-buttons { border: none !important; background: transparent !important; }
+.chat-area .message-buttons,
+.chat-area .icon-button-wrapper {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
 .chat-area .message-buttons button,
+.chat-area .icon-button-wrapper button,
 .chat-area button.action {
     background: transparent !important;
     border: none !important;
@@ -829,8 +835,18 @@ footer { display: none !important; }
     color: var(--ink-faint) !important;
 }
 .chat-area .message-buttons button:hover,
+.chat-area .icon-button-wrapper button:hover,
 .chat-area button.action:hover { color: var(--ink) !important; }
-.chat-area button svg { color: inherit !important; opacity: 0.85; }
+/* İkon SVG'leri görünür yap: rengi currentColor'a bağla, boyutu sabitle */
+.chat-area button svg,
+.chat-area .icon-button-wrapper svg {
+    color: inherit !important;
+    fill: currentColor !important;
+    stroke: currentColor !important;
+    opacity: 0.85;
+    width: 15px !important;
+    height: 15px !important;
+}
 
 /* ===== Güncel Gradio 5 baloncuk yapısı =====
    Yeni sürümlerde rol class'ı (.user/.bot) artık .flex-wrap'te değil;
