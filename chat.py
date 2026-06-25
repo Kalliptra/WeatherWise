@@ -580,6 +580,15 @@ def chat_skywise(messages: list[dict], anon_id: Optional[str] = None) -> Iterato
     _last_locations = [m.strip() for m in _LOC_TAG_RE.findall(final_text)]
     final_text = _LOC_TAG_RE.sub("", final_text).strip()
 
+    # Eksik-yanıt güvencesi: model bazen "... öneriler:" gibi içeriği olmayan tek satırlık
+    # bir başlık üretip duruyor (boş başlık hatası). Bu imzayı yakala ve kullanıcıya kırık
+    # yanıt yerine hava-duyarlı tek bir netleştirici soru göster.
+    if final_text.endswith(":") and "\n" not in final_text:
+        if _current_language == "en":
+            final_text = "Let's narrow it down — are you thinking morning or evening?"
+        else:
+            final_text = "Bunu biraz daraltalım — sabah mı yoksa akşam mı düşünüyorsun?"
+
     # Sol panel güvencesi: bu turda hava durumu zaten çekildiyse (current_weather_tool)
     # panel doğru şehirde. Çekilmediyse, ele alınan şehri belirle ve havasını çek:
     #   1) bu turda araca verilen şehir (sorulan/önerilen yer)
