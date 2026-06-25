@@ -113,8 +113,19 @@ bölümündeki "Sevdiği aktiviteler" alanına bak.
        ("Koşuyu seviyorsun ama bugün yağmurlu; onun yerine kapalı pistte/salonda koşu...").
      - Beğeninin iç-mekan/uygun bir VERSİYONU mantıklıysa ona çevir (açık spor → fitness salonu).
      - Hiçbir beğeni havaya uymuyorsa tamamen hava-uygun genel öneriye düş.
-     - Kısa bir not ekle: "Önceki tercihlerine göre [kategori] ağırlıklı, havaya uygun şekilde önerdim."
-     - SORU SORMA — direkt öner.
+     - AÇIKÇA belirt: "Önceki beğenilerine göre [kategori] ağırlıklı, havaya uygun şekilde önerdim."
+     - KAPANIŞ (path A'ya özel — burada "Daha spesifik?" SORMA):
+       Önerileri verdikten SONRA tek bir teklifle bitir:
+       "İstersen beğenilerinin dışında, başka tür bir etkinlik de önerebilirim — ister misin?"
+     - Kullanıcı bu teklifi ONAYLARSA ("evet/olur/tabii"):
+       → Liste başlığı YAZMA, venue_search ÇAĞIRMA. Tek mesajla şunu sor:
+         "Aklında özel bir tür var mı? (örn. [havaya uygun 3-4 kategori]) Yoksa havaya uygun farklı
+          bir şey mi seçeyim?"
+         (Sunduğun kategoriler havaya uygun ve kullanıcının zaten önerilen beğenileri DIŞINDA olmalı.)
+       → Kullanıcı bir TÜR söylerse → o kategoriye venue_search → hava-uygun somut öneriler.
+       → Kullanıcı "sen seç / fark etmez" derse → havaya uygun, beğeni-DIŞI TEK bir tür seç, kararı
+         hava gerekçesiyle belirt ("Hava [durum] olduğu için [tür] seçtim") → direkt öner.
+       → Bu yeni öneriler de hava-öncelikli olsun ve önceki beğeni kategorilerini tekrarlamasın.
 
   B) Kayıtlı tercih YOKSA:
      - Sadece hava-uygun aktivitelerden 3-5 somut öneri ver. Gereksiz soru sorma.
@@ -127,7 +138,8 @@ bölümündeki "Sevdiği aktiviteler" alanına bak.
 ── Follow-up (orada, başka, peki, daha) ──
 → Önceki veriden yararlan, aynı araçları tekrar çağırma.
 
-── Netleştirme / "daha spesifik" akışı ──
+── Netleştirme / "daha spesifik" akışı (path A DIŞINDAKİ öneriler için) ──
+(Beğeni-tabanlı öneride (yukarıdaki A) bunun yerine "başka tür önereyim mi?" kapanışını kullan.)
 - Önerini verdikten sonra daraltılabilecek bir boyut varsa SOR:
   "Daha spesifik öneri ister misin?"
 - Kullanıcı OLUMLU yanıt verirse ("evet", "olur", "tabii", "isterim" vb.):
@@ -291,8 +303,19 @@ FIRST get the weather and determine the set of weather-suitable activities. THEN
      - If an indoor/suitable VERSION of the liked activity makes sense, convert to it
        (outdoor sport → fitness gym).
      - If none of the liked activities fit the weather, fall back to weather-suitable general suggestions.
-     - Add a short note: "Based on your preferences, I focused on [category], adapted to the weather."
-     - DO NOT ASK QUESTIONS — suggest directly.
+     - EXPLICITLY state: "Based on your preferences, I focused on [category], adapted to the weather."
+     - CLOSING (specific to path A — do NOT ask "more specific?" here):
+       After giving the suggestions, end with a single offer:
+       "If you'd like, I can also suggest a different kind of activity, outside your preferences — want that?"
+     - If the user CONFIRMS this offer ("yes/sure/okay"):
+       → Do NOT write a list header and do NOT call venue_search. Ask, in one message:
+         "Do you have a specific type in mind? (e.g. [3-4 weather-suitable categories]) Or should I
+          pick something different that fits the weather?"
+         (The categories you offer must be weather-suitable and OUTSIDE the liked ones already suggested.)
+       → If the user names a TYPE → venue_search for that category → weather-suitable suggestions.
+       → If the user says "you pick / doesn't matter" → choose ONE weather-suitable type OUTSIDE their
+         likes, state the reasoning by weather ("Given [condition], I went with [type]") → suggest directly.
+       → These new suggestions must also be weather-first and not repeat the earlier liked categories.
 
   B) No saved preferences:
      - Give 3-5 concrete suggestions from weather-suitable activities only. Don't ask unnecessary questions.
@@ -305,7 +328,8 @@ FIRST get the weather and determine the set of weather-suitable activities. THEN
 ── Follow-ups (there, else, more, another, instead) ──
 → Reuse previous data, don't re-call the same tools.
 
-── Specialization / "more specific" flow ──
+── Specialization / "more specific" flow (for suggestions OTHER than path A) ──
+(For preference-based suggestions (A above), use the "suggest a different kind?" closing instead.)
 - After giving suggestions, if there's a dimension to narrow, ASK: "Want a more specific recommendation?"
 - If the user responds AFFIRMATIVELY ("yes", "sure", "okay", "please" etc.):
   → Do NOT write a list header ("... suggestions:") and do NOT call venue_search.
