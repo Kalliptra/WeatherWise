@@ -681,6 +681,7 @@ with gr.Blocks(
                 height=520,
                 elem_classes="chat-area",
                 show_copy_button=True,
+                show_share_button=False,
                 show_label=False,
                 avatar_images=(None, None),
             )

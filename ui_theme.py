@@ -847,6 +847,11 @@ footer { display: none !important; }
     width: 15px !important;
     height: 15px !important;
 }
+/* Chatbot'un sağ üst araç çubuğunu (paylaş + temizle/çöp) gizle.
+   Bu araç çubuğu .message-row DIŞINDA; mesaj başına kopyala butonu korunur.
+   Temizle/çöp butonunun Gradio'da kapatma parametresi yok, bu yüzden CSS ile. */
+.chat-area .icon-button-wrapper { display: none !important; }
+.chat-area .message-row .icon-button-wrapper { display: flex !important; }
 
 /* ===== Güncel Gradio 5 baloncuk yapısı =====
    Yeni sürümlerde rol class'ı (.user/.bot) artık .flex-wrap'te değil;
