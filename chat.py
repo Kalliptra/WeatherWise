@@ -269,7 +269,7 @@ def hourly_timing_tool(city: str) -> str:
     Use this for timing questions ('yağmur ne zaman', 'kaçta yağacak', 'when does it rain',
     'hour by hour') so activities can be scheduled around rain and high-UV periods."""
     try:
-        f = get_hourly_forecast(city, days=1, lang=_current_language)
+        f = get_hourly_forecast(city, days=3, lang=_current_language)
         return summarize_timing(f, lang=_current_language)
     except (ValueError, ConnectionError) as e:
         return f"Hata: {e}"
