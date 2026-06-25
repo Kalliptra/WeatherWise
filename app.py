@@ -40,6 +40,8 @@ from chat import (  # noqa: E402
 from tools.memory import (  # noqa: E402
     apply_feedback,
     get_activity_preferences,
+    get_personalization_level,
+    record_feedback,
     update_activity_preferences,
 )
 from ui_theme import (  # noqa: E402
@@ -48,6 +50,7 @@ from ui_theme import (  # noqa: E402
     render_map_panel,
     render_panel_placeholder,
     render_panel_skeleton,
+    render_personalization_badge,
     render_time_ribbon,
     render_weather_panel,
     weather_to_theme,
@@ -665,36 +668,71 @@ def update_time_ribbon():
     return gr.update(value=html, visible=True)
 
 
-def on_feedback(history, anon_id, evt: gr.LikeData):
-    """Bir öneri mesajına 👍/👎 → hafızayı arka planda günceller, toast gösterir."""
-    if not anon_id:
-        return
-    # evt.index messages modunda ilgili mesajın indeksidir; kullanıcı mesajına veya
-    # yazıyor-göstergesine basılan geri bildirimi yoksay.
-    idx = evt.index if isinstance(evt.index, int) else (evt.index or [0])[0]
-    msgs = history or []
-    if not (0 <= idx < len(msgs)):
-        return
-    msg = msgs[idx]
-    if not isinstance(msg, dict):
-        return
-    content = msg.get("content")
-    if msg.get("role") != "assistant" or not content or content == TYPING_INDICATOR:
-        return
-
-    lang = get_current_language()
+def _process_feedback(anon_id, content, liked, lang):
+    """Geri bildirim ortak işlemi: anlık sayaç + arka planda kategori çıkarımı + toast."""
+    record_feedback(anon_id, liked)  # senkron, hızlı — rozet hemen yansısın
     threading.Thread(
         target=apply_feedback,
-        args=(anon_id, content, bool(evt.liked), lang),
+        args=(anon_id, content, bool(liked), lang),
         daemon=True,
     ).start()
-
-    if evt.liked:
+    if liked:
         gr.Info("Tercihin kaydedildi 👍 — bunu daha sık öneririm" if lang != "en"
                 else "Noted 👍 — I'll suggest this more")
     else:
         gr.Info("Anlaşıldı 👎 — bunu bir daha pek önermem" if lang != "en"
                 else "Got it 👎 — I'll avoid this from now on")
+
+
+def _last_assistant_content(history):
+    """history'deki son geçerli asistan mesajının metnini döner (typing göstergesi hariç)."""
+    for msg in reversed(history or []):
+        if isinstance(msg, dict) and msg.get("role") == "assistant":
+            content = msg.get("content")
+            if content and content != TYPING_INDICATOR:
+                return content
+    return None
+
+
+def refresh_badge(anon_id):
+    """Sidebar kişiselleştirme rozetini güncel seviyeyle yeniler."""
+    return render_personalization_badge(
+        get_personalization_level(anon_id), get_current_language()
+    )
+
+
+def on_feedback_click(history, anon_id, liked):
+    """Açık 👍/👎 butonu: son öneriye geri bildirim uygular, güncel rozeti döner."""
+    lang = get_current_language()
+    if not anon_id:
+        return gr.update()
+    content = _last_assistant_content(history)
+    if not content:
+        return gr.update()
+    _process_feedback(anon_id, content, liked, lang)
+    return render_personalization_badge(get_personalization_level(anon_id), lang)
+
+
+def on_feedback(history, anon_id, evt: gr.LikeData):
+    """Native chatbot 👍/👎 (hover) → ortak feedback işlemini çalıştırır, güncel rozeti döner."""
+    if not anon_id:
+        return gr.update()
+    # evt.index messages modunda ilgili mesajın indeksidir; kullanıcı mesajına veya
+    # yazıyor-göstergesine basılan geri bildirimi yoksay.
+    idx = evt.index if isinstance(evt.index, int) else (evt.index or [0])[0]
+    msgs = history or []
+    if not (0 <= idx < len(msgs)):
+        return gr.update()
+    msg = msgs[idx]
+    if not isinstance(msg, dict):
+        return gr.update()
+    content = msg.get("content")
+    if msg.get("role") != "assistant" or not content or content == TYPING_INDICATOR:
+        return gr.update()
+
+    lang = get_current_language()
+    _process_feedback(anon_id, content, bool(evt.liked), lang)
+    return render_personalization_badge(get_personalization_level(anon_id), lang)
 
 
 def apply_geolocation(coords: str, anon_id: str = ""):
@@ -757,6 +795,7 @@ with gr.Blocks(
         with gr.Column(scale=1, min_width=200, elem_classes="session-sidebar", visible=True) as sidebar_col:
             new_chat_btn = gr.Button("➕ Yeni Sohbet", elem_classes="new-chat-btn")
             pref_update_btn = gr.Button("🔄 Tercihlerimi Sıfırla", elem_classes="new-chat-btn", size="sm")
+            pers_badge = gr.HTML(render_personalization_badge({}, "tr"), elem_classes="pers-badge")
 
             @gr.render(inputs=[sessions_state, session_id_state])
             def render_sessions(sessions, active_id):
@@ -827,6 +866,11 @@ with gr.Blocks(
                 avatar_images=(None, None),
             )
 
+            with gr.Row(visible=False, elem_classes="feedback-row") as feedback_row:
+                gr.HTML("<span class='feedback-q'>Bu öneri işine yaradı mı?</span>")
+                fb_like = gr.Button("👍 Beğendim", elem_classes="fb-btn")
+                fb_dislike = gr.Button("👎 Pek değil", elem_classes="fb-btn")
+
             queued_display = gr.HTML(value="", elem_classes="queued-display-wrapper")
 
             startup_status = gr.HTML(
@@ -871,12 +915,15 @@ with gr.Blocks(
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
     NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot, time_ribbon, weather_panel, theme_state]
 
+    reveal_feedback = lambda: gr.update(visible=True)
+    hide_feedback = lambda: gr.update(visible=False)
     for trigger in (textbox.submit, send_btn.click):
         (trigger(pre_submit, [textbox, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
          .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
          .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
          .then(update_time_ribbon, None, time_ribbon, show_progress="hidden", api_name=False)
+         .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
     for sug in (sug1, sug2, sug3, sug4):
         (sug.click(pre_submit, [sug, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
@@ -884,12 +931,17 @@ with gr.Blocks(
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
          .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
          .then(update_time_ribbon, None, time_ribbon, show_progress="hidden", api_name=False)
+         .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
 
-    chatbot.like(on_feedback, [chatbot, anon_id_box], None, api_name=False)
+    # Native chatbot (hover) 👍/👎 ve açık feedback butonları aynı işlemi paylaşır; ikisi de rozeti günceller.
+    chatbot.like(on_feedback, [chatbot, anon_id_box], pers_badge, api_name=False)
+    fb_like.click(lambda h, a: on_feedback_click(h, a, True), [chatbot, anon_id_box], pers_badge, show_progress="hidden", api_name=False)
+    fb_dislike.click(lambda h, a: on_feedback_click(h, a, False), [chatbot, anon_id_box], pers_badge, show_progress="hidden", api_name=False)
     # Yeni sohbet: panelleri temizle + konumu kullanıcının konumuna döndür, ardından
     # tarayıcı geolocation'ı yeniden çek (gerçekten taşındıysa geo_coords.change tetiklenir).
     (new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
+        .then(hide_feedback, None, feedback_row, show_progress="hidden", api_name=False)
         .then(None, None, geo_coords, js=GEO_JS, api_name=False))
     show_loc_btn.click(show_map_on_demand, None, [map_panel, show_loc_btn], show_progress="hidden", api_name=False)
 
@@ -923,15 +975,18 @@ with gr.Blocks(
     demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
     (anon_id_box.change(load_sessions_on_start, anon_id_box, sessions_state, show_progress="hidden", api_name=False)
         .then(check_and_show_onboarding, anon_id_box, ONBOARDING_OUTPUTS, show_progress="hidden", api_name=False)
+        .then(refresh_badge, anon_id_box, pers_badge, show_progress="hidden", api_name=False)
         .then(finish_startup, None, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
 
-    pref_update_btn.click(
+    (pref_update_btn.click(
         trigger_preference_reset,
         anon_id_box,
         NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS,
         show_progress="hidden",
         api_name=False,
     )
+        .then(hide_feedback, None, feedback_row, show_progress="hidden", api_name=False)
+        .then(refresh_badge, anon_id_box, pers_badge, show_progress="hidden", api_name=False))
 
 
 if __name__ == "__main__":

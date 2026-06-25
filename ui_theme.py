@@ -426,6 +426,52 @@ def render_panel_skeleton() -> str:
     )
 
 
+def render_personalization_badge(level_info: dict, lang: str = "tr") -> str:
+    """Sidebar kişiselleştirme seviyesi rozeti: 5 noktalı gösterge + Lv N + tek satır açıklama."""
+    info = level_info or {}
+    level = int(info.get("level", 0))
+    liked = info.get("liked", []) or []
+    disliked = info.get("disliked", []) or []
+
+    dots = "".join(
+        f'<span class="pb-dot{" on" if i < level else ""}"></span>' for i in range(5)
+    )
+
+    if level <= 0:
+        title = "Kişiselleştirme" if lang != "en" else "Personalization"
+        desc = ("Öneriler ver/beğen, sana göre şekillensin"
+                if lang != "en" else "Give feedback to tailor suggestions")
+        lvl_label = "Lv 0"
+    else:
+        title = "Kişiselleştirme" if lang != "en" else "Personalization"
+        lvl_label = f"Lv {level}"
+        if lang == "en":
+            parts = []
+            if liked:
+                parts.append(f"{len(liked)} liked")
+            if disliked:
+                parts.append(f"{len(disliked)} disliked")
+            stat = ", ".join(parts) if parts else "learning"
+            desc = f"{stat} — suggestions are shaped for you"
+        else:
+            parts = []
+            if liked:
+                parts.append(f"{len(liked)} beğeni")
+            if disliked:
+                parts.append(f"{len(disliked)} beğenmeme")
+            stat = ", ".join(parts) if parts else "öğreniyor"
+            desc = f"{stat} — öneriler sana göre şekilleniyor"
+
+    return (
+        '<div class="pers-badge-inner">'
+        f'<div class="pb-head"><span class="pb-title">{title}</span>'
+        f'<span class="pb-lvl">{lvl_label}</span></div>'
+        f'<div class="pb-dots">{dots}</div>'
+        f'<div class="pb-desc">{desc}</div>'
+        "</div>"
+    )
+
+
 def render_forecast_chart(forecast: dict, horizon: int = 48):
     """tools.forecast.get_hourly_forecast() çıktısından Plotly figürü üretir.
 
@@ -1119,6 +1165,84 @@ button.new-chat-btn:hover, .new-chat-btn button:hover {
     text-align: center;
     padding: 14px 6px;
     opacity: 0.8;
+}
+
+/* Kişiselleştirme seviyesi rozeti (sidebar) */
+.pers-badge { margin: 2px 0 10px 0 !important; }
+.pers-badge-inner {
+    background: var(--surface, rgba(255,255,255,0.04));
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 9px 11px;
+}
+.pers-badge-inner .pb-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.pers-badge-inner .pb-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    letter-spacing: .3px;
+}
+.pers-badge-inner .pb-lvl {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--accent);
+}
+.pers-badge-inner .pb-dots {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 6px;
+}
+.pers-badge-inner .pb-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--line-strong, var(--line));
+    opacity: 0.55;
+}
+.pers-badge-inner .pb-dot.on {
+    background: var(--accent);
+    opacity: 1;
+    box-shadow: 0 0 6px var(--glow);
+}
+.pers-badge-inner .pb-desc {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-soft);
+    opacity: 0.9;
+}
+
+/* Açık öneri geri bildirim satırı (👍/👎) — sohbet ile giriş arasında */
+.feedback-row {
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 4px 2px 2px 2px !important;
+    flex-wrap: wrap;
+}
+.feedback-row .feedback-q {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-right: 2px;
+}
+button.fb-btn, .fb-btn button {
+    background: transparent !important;
+    border: 1px solid var(--line) !important;
+    color: var(--ink) !important;
+    border-radius: 999px !important;
+    font-weight: 600 !important;
+    font-size: 12.5px !important;
+    padding: 4px 14px !important;
+    min-width: 0 !important;
+    flex: 0 0 auto !important;
+}
+button.fb-btn:hover, .fb-btn button:hover {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    box-shadow: 0 4px 12px var(--glow);
 }
 .session-row, .session-rename-row {
     gap: 4px !important;

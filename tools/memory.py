@@ -236,6 +236,51 @@ def apply_feedback(
         pass
 
 
+def _level_from(count: int, prefs: dict) -> dict:
+    """Geri bildirim sayısı + kategori çeşitliliğinden seviye sözlüğü üretir.
+
+    `count` (açık 👍/👎 sayısı) anlık güncellenen birincil sinyaldir; kategori
+    çeşitliliği (liked+disliked) tabanı yükseltir, böylece onboarding sonrası
+    rozet 0'da kalmaz. Seviye 1-5, ilerleme 0-100 arasıdır.
+    """
+    liked = prefs.get("liked", []) if prefs else []
+    disliked = prefs.get("disliked", []) if prefs else []
+    diversity = len(liked) + len(disliked)
+    score = max(count, diversity)
+    level = min(5, 1 + score // 2) if score else 0
+    pct = min(100, score * 20)
+    return {
+        "count": count,
+        "level": level,
+        "pct": pct,
+        "liked": liked,
+        "disliked": disliked,
+    }
+
+
+def record_feedback(anon_id: Optional[str], liked: bool) -> dict:
+    """Açık 👍/👎 tıklamasını anlık (LLM beklemeden) sayaca işler ve güncel seviyeyi döner.
+
+    Kategori çıkarımı `apply_feedback` ile arka planda ayrıca yapılır; bu fonksiyon
+    yalnızca sayaçları artırıp rozetin hemen güncellenmesini sağlar. anon_id yoksa
+    boş seviye döner.
+    """
+    if not anon_id:
+        return _level_from(0, {})
+    memory = load_memory(anon_id)
+    memory["feedback_count"] = int(memory.get("feedback_count", 0)) + 1
+    key = "liked_count" if liked else "disliked_count"
+    memory[key] = int(memory.get(key, 0)) + 1
+    save_memory(anon_id, memory)
+    return _level_from(memory["feedback_count"], memory.get("preferences", {}))
+
+
+def get_personalization_level(anon_id: Optional[str]) -> dict:
+    """Kullanıcının güncel kişiselleştirme seviyesini döner. anon_id yoksa boş seviye."""
+    memory = load_memory(anon_id) if anon_id else {}
+    return _level_from(int(memory.get("feedback_count", 0)), memory.get("preferences", {}))
+
+
 def extract_and_update(
     messages: list[dict],
     city: Optional[str],
