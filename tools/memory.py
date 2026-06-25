@@ -119,8 +119,9 @@ def format_memory_block(memory: dict, lang: str = "tr") -> str:
                 city_str = f" ({c['city']})" if c.get("city") else ""
                 parts.append(f"  - {c.get('date', '')}{city_str}: {c.get('summary', '')}")
         parts.append(
-            "Bu bilgileri önerilerinde kullan ama hafızadan açıkça bahsetme. "
-            "Kullanıcı sormadıkça 'geçen sefer' gibi ifadeler kullanma."
+            "Bu bilgileri önerilerinde kullan. Kayıtlı tercih kategorilerine göre öne "
+            "çıkardığını belirtebilirsin (örn. 'Önceki beğenilerine göre [kategori] ağırlıklı "
+            "önerdim'). Ancak geçmiş konuşma içeriğine ('geçen sefer şöyle demiştin') atıf yapma."
         )
     else:
         parts.append("## User Memory")
@@ -138,8 +139,9 @@ def format_memory_block(memory: dict, lang: str = "tr") -> str:
                 city_str = f" ({c['city']})" if c.get("city") else ""
                 parts.append(f"  - {c.get('date', '')}{city_str}: {c.get('summary', '')}")
         parts.append(
-            "Use this to personalize suggestions but don't explicitly mention the memory. "
-            "Don't say 'last time' unless the user asks."
+            "Use this to personalize suggestions. You may state that you prioritized based on "
+            "saved preference categories (e.g. 'Based on your preferences, I focused on [category]'). "
+            "But do not reference past conversation content ('last time you said...')."
         )
 
     return "\n".join(parts)
