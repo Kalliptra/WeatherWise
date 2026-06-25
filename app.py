@@ -52,7 +52,6 @@ from tools.memory import (  # noqa: E402
 )
 from ui_theme import (  # noqa: E402
     CUSTOM_CSS,
-    render_forecast_chart,
     render_locations_map,
     render_map_panel,
     render_panel_placeholder,
@@ -415,7 +414,6 @@ def clear_chat():
         [],
         "",
         "",
-        gr.update(visible=False),
         gr.update(value="", visible=False),
         weather_panel,
         theme,
@@ -600,7 +598,6 @@ def trigger_preference_reset(anon_id, lang: str = DEFAULT_LANG):
         [],                                    # queued_state
         "",                                    # queued_display
         "",                                    # session_id_state
-        gr.update(visible=False),              # forecast_plot
         gr.update(value="", visible=False),    # time_ribbon
         weather_panel,                         # weather_panel
         theme,                                 # theme_state
@@ -659,17 +656,6 @@ def set_busy():
 def set_idle():
     """Cevap bitince 'Gönder'i yeniden aktif eder."""
     return gr.update(interactive=True)
-
-
-def update_forecast_chart():
-    """Bu turda çekilen saatlik tahminden Plotly grafiği üretir (yoksa gizler)."""
-    try:
-        fig = render_forecast_chart(get_last_forecast(), lang=get_current_language())
-    except Exception:
-        fig = None
-    if fig is None:
-        return gr.update(visible=False)
-    return gr.update(value=fig, visible=True)
 
 
 def update_time_ribbon():
@@ -924,7 +910,6 @@ with gr.Blocks(
         with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
             weather_panel = gr.HTML(render_panel_skeleton())
             time_ribbon = gr.HTML(value="", visible=False, elem_classes="time-ribbon-wrap")
-            forecast_plot = gr.Plot(visible=False, elem_classes="forecast-plot", show_label=False)
             map_panel = gr.HTML(value="", visible=False)
             show_loc_btn = gr.Button(t(DEFAULT_LANG, "show_map_btn"), visible=False, elem_classes="loc-btn")
 
@@ -997,7 +982,7 @@ with gr.Blocks(
     RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display, session_id_state, sessions_state]
     RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, anon_id_box, lang_state]
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
-    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot, time_ribbon, weather_panel, theme_state]
+    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, time_ribbon, weather_panel, theme_state]
     # Dil geçişinde güncellenecek tüm statik arayüz bileşenleri (apply_language sırası ile birebir).
     LANG_CHROME_OUTPUTS = [lang_state, lang_toggle_btn, topbar_html, greeting_html, sug1, sug2, sug3, sug4, new_chat_btn, pref_update_btn, show_loc_btn, feedback_q_html, fb_like, fb_dislike, send_btn, textbox, startup_status]
 
@@ -1009,7 +994,6 @@ with gr.Blocks(
         (trigger(pre_submit, [textbox, queued_state, lang_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
          .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
-         .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
          .then(update_time_ribbon, None, time_ribbon, show_progress="hidden", api_name=False)
          .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
@@ -1017,7 +1001,6 @@ with gr.Blocks(
         (sug.click(pre_submit, [sug, queued_state, lang_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
          .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
-         .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
          .then(update_time_ribbon, None, time_ribbon, show_progress="hidden", api_name=False)
          .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))

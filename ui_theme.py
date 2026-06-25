@@ -1536,18 +1536,6 @@ button.suggestion-btn:hover {
 }
 .tr-legend .tr-dot:first-child { margin-left: 0; }
 
-/* ---- Tahmin grafiği ---- */
-.forecast-plot {
-    margin-top: 14px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 18px;
-    padding: 8px 6px;
-}
-.forecast-plot .js-plotly-plot,
-.forecast-plot .plotly,
-.forecast-plot .plot-container { background: transparent !important; }
-
 /* ---- Venue kartları ---- */
 .map-panel { margin-top: 14px; }
 .venue-strip {
