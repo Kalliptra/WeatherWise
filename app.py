@@ -721,6 +721,7 @@ with gr.Blocks(
     ),
     css=CUSTOM_CSS,
     js=FORCE_DARK_JS,
+    fill_width=True,
 ) as demo:
     with gr.Row(elem_classes="topbar-row"):
         toggle_sidebar_btn = gr.Button("◀", elem_classes="sidebar-toggle", scale=0)
