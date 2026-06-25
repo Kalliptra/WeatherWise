@@ -121,10 +121,15 @@ _ACTIVITY_TRIGGERS = frozenset([
     "öneri", "oneri", "öner", "oner", "nereye", "ne yapabilirim", "gez", "git", "yap",
     "plaj", "sinema", "galeri", "kütüphane", "kutuphane", "manzara",
     "etkinlik", "etkinlikleri", "gezi", "yürüyüş", "yuruyus", "piknik",
+    # TR — beğeni/tercih ifadeleri ("beğenilerime göre seç/öner")
+    "beğeni", "beğenilerim", "beğenilerime", "begeni", "begenilerim", "begenilerime",
+    "tercih", "tercihlerim", "tercihlerime", "favori", "sevdiğim", "sevdigim",
     # EN
     "museum", "cafe", "restaurant", "activity", "activities", "suggest", "recommend",
     "where", "what can", "beach", "cinema", "gallery", "library", "viewpoint",
     "walk", "hike", "picnic",
+    # EN — preference expressions
+    "preference", "preferences", "prefer", "like", "likes", "favorite", "favorites",
 ])
 _FOLLOWUP_TR = frozenset(["orada", "başka", "baska", "daha", "peki", "diğer", "diger"])
 _FOLLOWUP_EN = frozenset(["there", "else", "another", "other", "more", "instead"])
