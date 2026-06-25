@@ -16,6 +16,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from dotenv import load_dotenv
+
+# .env'i import sırasında yükle — Redis env'leri başka bir modülün önce import
+# edilmesine bağlı kalmadan her zaman mevcut olsun.
+load_dotenv()
+
 # Anonim session'lar için TTL (saniye). Her yazımda yenilenir.
 ANON_TTL = 86400  # 24 saat
 

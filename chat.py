@@ -85,6 +85,11 @@ def set_user_location(city: str) -> None:
     _user_location = city or None
 
 
+def get_user_location() -> Optional[str]:
+    """Geolocation/konuşma ile tespit edilmiş güncel konum (yoksa None)."""
+    return _user_location
+
+
 def _detect_language(text: str) -> str:
     if any(c in _TURKISH_CHARS for c in text):
         return "tr"

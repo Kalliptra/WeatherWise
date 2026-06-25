@@ -13,6 +13,12 @@ import threading
 from datetime import date
 from typing import Optional
 
+from dotenv import load_dotenv
+
+# .env'i import sırasında yükle — Redis env'leri başka bir modülün önce import
+# edilmesine bağlı kalmadan her zaman mevcut olsun.
+load_dotenv()
+
 MAX_CONVERSATIONS = 10
 
 # Anonim hafıza için TTL (saniye). Her yazımda yenilenir (sessions ile aynı).

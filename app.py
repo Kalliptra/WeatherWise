@@ -32,6 +32,7 @@ from chat import (  # noqa: E402
     generate_location_suggestions,
     generate_session_title,
     get_current_language,
+    get_user_location,
     set_user_location,
 )
 from tools.memory import get_activity_preferences, update_activity_preferences  # noqa: E402
@@ -552,6 +553,9 @@ def trigger_preference_update():
 
 
 def load_default_city():
+    # Geolocation zaten gerçek konumu uyguladıysa varsayılan şehirle üzerine yazma.
+    if get_user_location():
+        return gr.update(), gr.update()
     try:
         weather = get_weather(DEFAULT_CITY)
         return render_weather_panel(weather), weather_to_theme(weather)
@@ -598,25 +602,30 @@ def update_forecast_chart():
     return gr.update(value=fig, visible=True)
 
 
-_GENEL_ONERILER = [
-    "Bulunduğum yerde bugün hava nasıl?",
-    "Yakınımda ne yapabilirim?",
-    "What's the weather like near me today?",
-    "Recommend something to do nearby",
-]
+def apply_geolocation(coords: str, anon_id: str = ""):
+    """Tarayıcıdan gelen koordinatlarla hava durumunu konuma göre günceller.
 
-
-def apply_geolocation(coords: str):
+    Onboarding sırasındaki (tercihi olmayan) kullanıcıda öneri butonlarına dokunmaz —
+    kategori butonları korunur ve gereksiz LLM çağrısı yapılmaz. Yalnızca tercihi olan
+    kullanıcılar için konuma özel öneriler üretilir.
+    """
+    noop_sugs = (gr.update(), gr.update(), gr.update(), gr.update())
     try:
         lat, lon = (float(x) for x in (coords or "").split(","))
         weather = get_weather_by_coords(lat, lon)
         set_user_location(weather["city"])
+        try:
+            has_prefs = bool(get_activity_preferences(anon_id)) if anon_id else False
+        except Exception:
+            has_prefs = False
+        if not has_prefs:
+            # Onboarding aktif: kategori butonlarını koru, sadece hava/temayı güncelle.
+            return render_weather_panel(weather), weather_to_theme(weather), *noop_sugs
         suggestions = generate_location_suggestions(weather["city"], weather["country"], weather)
         btn_updates = [gr.update(value=s) for s in suggestions]
         return render_weather_panel(weather), weather_to_theme(weather), *btn_updates
     except Exception:
-        btn_updates = [gr.update(value=s) for s in _GENEL_ONERILER]
-        return gr.update(), gr.update(), *btn_updates
+        return gr.update(), gr.update(), *noop_sugs
 
 
 with gr.Blocks(
@@ -791,14 +800,15 @@ with gr.Blocks(
     ONBOARDING_OUTPUTS = [greeting_html, sug1, sug2, sug3, sug4]
     STARTUP_ENABLE_OUTPUTS = [textbox, send_btn, sug1, sug2, sug3, sug4, startup_status]
 
-    # Geolocation bloklamayan ek bir akıştır: arka planda şehri/önerileri rafine eder.
+    # Hava durumu (varsayılan şehir) bağımsız/paralel yüklenir — girişleri bloklamaz.
+    # Geolocation gerçek konumu uygularsa load_default_city üzerine yazmaz (yarış önlenir).
+    demo.load(load_default_city, None, [weather_panel, theme_state], show_progress="hidden", api_name=False)
     demo.load(None, None, geo_coords, js=GEO_JS, api_name=False)
-    geo_coords.change(apply_geolocation, geo_coords, [weather_panel, theme_state, sug1, sug2, sug3, sug4], show_progress="hidden", api_name=False)
+    geo_coords.change(apply_geolocation, [geo_coords, anon_id_box], [weather_panel, theme_state, sug1, sug2, sug3, sug4], show_progress="hidden", api_name=False)
 
-    # Açılış zinciri: anon-id (JS) → varsayılan şehir hava durumu → oturum listesi →
-    # onboarding kontrolü → girişleri aç. Hepsi hazır olana kadar inputlar kilitli kalır.
+    # Giriş kilidi yalnızca hızlı Redis okumalarına bağlıdır: anon-id (JS) → oturum listesi →
+    # onboarding kontrolü → girişleri aç. Hava durumu beklenmez (skeleton ile dolar).
     (demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
-        .then(load_default_city, None, [weather_panel, theme_state], show_progress="hidden", api_name=False)
         .then(load_sessions_on_start, anon_id_box, sessions_state, show_progress="hidden", api_name=False)
         .then(check_and_show_onboarding, anon_id_box, ONBOARDING_OUTPUTS, show_progress="hidden", api_name=False)
         .then(finish_startup, None, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
