@@ -159,16 +159,21 @@ FORCE_DARK_JS = """
     if (!document.body.dataset.theme) document.body.dataset.theme = 'clear-day';
 
     document.addEventListener('keydown', function(e) {
-        if (e.key !== 'Tab') return;
+        if (e.key !== 'Tab' || e.shiftKey) return;
         var sugBox = document.querySelector('#skywise-suggestion textarea, #skywise-suggestion input');
         if (!sugBox) return;
         var val = sugBox.value || sugBox.textContent || '';
         if (!val.trim()) return;
-        var chatInput = document.querySelector('.chat-input-row textarea');
+        // Tek satırlık Textbox Gradio'da <input> olarak render edilir (textarea değil),
+        // bu yüzden ikisini de seç ve doğru prototip setter'ını kullan.
+        var chatInput = document.querySelector('.chat-input-row textarea, .chat-input-row input');
         if (!chatInput) return;
         e.preventDefault();
-        // Svelte/React controlled input için native setter kullan
-        var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+        // Svelte/React controlled input için native setter kullan (input vs textarea)
+        var proto = chatInput.tagName === 'TEXTAREA'
+            ? window.HTMLTextAreaElement.prototype
+            : window.HTMLInputElement.prototype;
+        var nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value').set;
         nativeSetter.call(chatInput, val);
         chatInput.dispatchEvent(new Event('input', { bubbles: true }));
         chatInput.focus();
