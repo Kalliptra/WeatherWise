@@ -410,6 +410,22 @@ def render_panel_placeholder(message: str) -> str:
     )
 
 
+def render_panel_skeleton() -> str:
+    """Hava paneli yüklenirken gösterilen, içerik şekilli shimmer'lı iskelet."""
+    return (
+        '<div class="wx-panel wx-skeleton" aria-busy="true" aria-label="Hava durumu yükleniyor">'
+        '<div class="sk sk-city"></div>'
+        '<div class="sk sk-temp"></div>'
+        '<div class="sk sk-cond"></div>'
+        '<div class="sk-row">'
+        '<div class="sk sk-chip"></div>'
+        '<div class="sk sk-chip"></div>'
+        '<div class="sk sk-chip"></div>'
+        "</div>"
+        "</div>"
+    )
+
+
 def render_forecast_chart(forecast: dict, horizon: int = 48):
     """tools.forecast.get_hourly_forecast() çıktısından Plotly figürü üretir.
 
@@ -1291,9 +1307,98 @@ button.suggestion-btn:hover {
 }
 .typing-indicator span:nth-child(2) { animation-delay: 0.18s; }
 .typing-indicator span:nth-child(3) { animation-delay: 0.36s; }
+.typing-indicator .typing-label {
+    width: auto;
+    height: auto;
+    margin-left: 4px;
+    background: none;
+    border-radius: 0;
+    animation: none;
+    color: var(--ink-faint);
+    font-size: 0.82em;
+    font-style: italic;
+    opacity: 0.7;
+    letter-spacing: 0.01em;
+}
 @keyframes typing-bounce {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
     30% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* ---- Skeleton shimmer (hava paneli yüklenirken) ---- */
+.wx-skeleton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+.wx-skeleton .sk {
+    border-radius: 10px;
+    background: linear-gradient(
+        100deg,
+        rgba(255, 255, 255, 0.04) 30%,
+        rgba(255, 255, 255, 0.12) 50%,
+        rgba(255, 255, 255, 0.04) 70%
+    );
+    background-size: 220% 100%;
+    animation: sk-shimmer 1.4s ease-in-out infinite;
+}
+.wx-skeleton .sk-city { width: 55%; height: 18px; }
+.wx-skeleton .sk-temp { width: 40%; height: 46px; border-radius: 14px; }
+.wx-skeleton .sk-cond { width: 65%; height: 14px; }
+.wx-skeleton .sk-row { display: flex; gap: 10px; margin-top: 6px; }
+.wx-skeleton .sk-chip { width: 56px; height: 26px; border-radius: 13px; }
+@keyframes sk-shimmer {
+    0% { background-position: 180% 0; }
+    100% { background-position: -80% 0; }
+}
+
+/* ---- Açılış "Hazırlanıyor" durumu ---- */
+.startup-status-wrapper { padding: 2px 0 6px; }
+.startup-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 9px 14px;
+    border-radius: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 0.88em;
+    letter-spacing: 0.01em;
+    backdrop-filter: blur(14px) saturate(120%);
+    -webkit-backdrop-filter: blur(14px) saturate(120%);
+    animation: startup-pulse 1.8s ease-in-out infinite;
+}
+.startup-status .startup-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    border-top-color: var(--accent, #7c5cff);
+    animation: startup-spin 0.8s linear infinite;
+}
+@keyframes startup-spin { to { transform: rotate(360deg); } }
+@keyframes startup-pulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+
+/* ---- "Meşgul" / devre dışı giriş durumları ---- */
+.chat-input-row button.primary:disabled,
+.chat-input-row button.primary[disabled] {
+    opacity: 0.55 !important;
+    cursor: progress !important;
+    filter: saturate(0.7);
+}
+.chat-input-row textarea:disabled,
+.chat-input-row input:disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+.suggestion-btn:disabled,
+.suggestion-btn[disabled] {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
 }
 
 /* ---- Mobil ---- */

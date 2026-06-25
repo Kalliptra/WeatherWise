@@ -40,6 +40,7 @@ from ui_theme import (  # noqa: E402
     render_locations_map,
     render_map_panel,
     render_panel_placeholder,
+    render_panel_skeleton,
     render_weather_panel,
     weather_to_theme,
 )
@@ -139,9 +140,12 @@ async () => {
 
 THEME_JS = "(t) => { document.body.dataset.theme = t || 'clear-day'; }"
 
-# Yanıt beklenirken gösterilen "yazıyor..." üç nokta animasyonu
+# Yanıt beklenirken gösterilen "yazıyor..." üç nokta animasyonu + nazik etiket
 TYPING_INDICATOR = (
-    '<div class="typing-indicator"><span></span><span></span><span></span></div>'
+    '<div class="typing-indicator">'
+    '<span></span><span></span><span></span>'
+    '<span class="typing-label">yanıt hazırlanıyor</span>'
+    "</div>"
 )
 
 # Gradio'nun kendi koyu modunu zorla (dahili bileşenler de koyuya uysun) +
@@ -460,7 +464,7 @@ def on_delete_session(sid, active_id, anon_id):
             new_list,
             gr.update(value=[], visible=False),
             gr.update(visible=True),
-            render_panel_placeholder("Hava durumu yükleniyor..."),
+            render_panel_skeleton(),
             gr.update(value="", visible=False),
             gr.update(visible=False),
             "",
@@ -555,6 +559,34 @@ def load_default_city():
         return render_panel_placeholder("Hava durumu alınamadı."), "clear-day"
 
 
+DEFAULT_PLACEHOLDER = "Etkinlik sor... (örn: \"Bugün koşu için hava uygun mu?\")"
+
+
+def finish_startup():
+    """Açılış yüklemeleri (hava durumu + oturumlar + onboarding) bitince çağrılır.
+    Girişleri aktif eder ve 'Hazırlanıyor' durumunu gizler.
+    Dönüş: (textbox, send_btn, sug1, sug2, sug3, sug4, startup_status)."""
+    return (
+        gr.update(interactive=True, placeholder=DEFAULT_PLACEHOLDER),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(interactive=True),
+        gr.update(visible=False),
+    )
+
+
+def set_busy():
+    """Cevap üretilirken 'Gönder'i kilitler (sıraya-alma textbox üzerinden korunur)."""
+    return gr.update(interactive=False)
+
+
+def set_idle():
+    """Cevap bitince 'Gönder'i yeniden aktif eder."""
+    return gr.update(interactive=True)
+
+
 def update_forecast_chart():
     """Bu turda çekilen saatlik tahminden Plotly grafiği üretir (yoksa gizler)."""
     try:
@@ -642,24 +674,27 @@ with gr.Blocks(
                         lambda a, _s=sid: on_select_session(_s, a),
                         [anon_id_box],
                         [chatbot, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, session_id_state],
+                        show_progress="hidden",
                         api_name=False,
                     )
-                    rename_btn.click(lambda: gr.update(visible=True), None, rename_row, api_name=False)
+                    rename_btn.click(lambda: gr.update(visible=True), None, rename_row, show_progress="hidden", api_name=False)
                     rename_save.click(
                         lambda t, a, _s=sid: on_rename_session(_s, t, a),
                         [rename_box, anon_id_box],
                         [sessions_state, rename_row],
+                        show_progress="hidden",
                         api_name=False,
                     )
                     del_btn.click(
                         lambda act, a, _s=sid: on_delete_session(_s, act, a),
                         [session_id_state, anon_id_box],
                         [sessions_state, chatbot, empty_state, weather_panel, map_panel, show_loc_btn, location_state, session_id_state],
+                        show_progress="hidden",
                         api_name=False,
                     )
 
         with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
-            weather_panel = gr.HTML(render_panel_placeholder("Hava durumu yükleniyor..."))
+            weather_panel = gr.HTML(render_panel_skeleton())
             forecast_plot = gr.Plot(visible=False, elem_classes="forecast-plot", show_label=False)
             map_panel = gr.HTML(value="", visible=False)
             show_loc_btn = gr.Button("📍 Konumu Haritada Göster", visible=False, elem_classes="loc-btn")
@@ -668,11 +703,11 @@ with gr.Blocks(
             with gr.Column(visible=True, elem_classes="empty-state") as empty_state:
                 greeting_html = gr.HTML(KARSILAMA_HTML)
                 with gr.Row():
-                    sug1 = gr.Button(ORNEK_SORULAR[0], elem_classes="suggestion-btn")
-                    sug2 = gr.Button(ORNEK_SORULAR[1], elem_classes="suggestion-btn")
+                    sug1 = gr.Button(ORNEK_SORULAR[0], elem_classes="suggestion-btn", interactive=False)
+                    sug2 = gr.Button(ORNEK_SORULAR[1], elem_classes="suggestion-btn", interactive=False)
                 with gr.Row():
-                    sug3 = gr.Button(ORNEK_SORULAR[2], elem_classes="suggestion-btn")
-                    sug4 = gr.Button(ORNEK_SORULAR[3], elem_classes="suggestion-btn")
+                    sug3 = gr.Button(ORNEK_SORULAR[2], elem_classes="suggestion-btn", interactive=False)
+                    sug4 = gr.Button(ORNEK_SORULAR[3], elem_classes="suggestion-btn", interactive=False)
 
             chatbot = gr.Chatbot(
                 value=[],
@@ -688,16 +723,24 @@ with gr.Blocks(
 
             queued_display = gr.HTML(value="", elem_classes="queued-display-wrapper")
 
+            startup_status = gr.HTML(
+                '<div class="startup-status"><span class="startup-dot"></span>'
+                "Senin için hava durumu ve öneriler hazırlanıyor…</div>",
+                visible=True,
+                elem_classes="startup-status-wrapper",
+            )
+
             with gr.Row(elem_classes="chat-input-row"):
                 textbox = gr.Textbox(
-                    placeholder="Etkinlik sor... (örn: \"Bugün koşu için hava uygun mu?\")",
+                    placeholder="Hazırlanıyor…",
                     scale=9,
                     container=False,
                     lines=1,
                     max_lines=1,
                     show_label=False,
+                    interactive=False,
                 )
-                send_btn = gr.Button("Gönder ↗", variant="primary", scale=1)
+                send_btn = gr.Button("Gönder ↗", variant="primary", scale=1, interactive=False)
 
     gr.Markdown(
         """
@@ -723,38 +766,48 @@ with gr.Blocks(
     NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot]
 
     for trigger in (textbox.submit, send_btn.click):
-        (trigger(pre_submit, [textbox, queued_state], PRE_OUTPUTS, api_name=False)
-         .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, api_name=False)
-         .then(update_forecast_chart, None, forecast_plot, api_name=False))
+        (trigger(pre_submit, [textbox, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
+         .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
+         .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
+         .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
+         .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
     for sug in (sug1, sug2, sug3, sug4):
-        (sug.click(pre_submit, [sug, queued_state], PRE_OUTPUTS, api_name=False)
-         .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, api_name=False)
-         .then(update_forecast_chart, None, forecast_plot, api_name=False))
-    new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, api_name=False)
-    show_loc_btn.click(show_location_on_map, location_state, [map_panel, show_loc_btn], api_name=False)
+        (sug.click(pre_submit, [sug, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
+         .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
+         .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
+         .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
+         .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
+    new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
+    show_loc_btn.click(show_location_on_map, location_state, [map_panel, show_loc_btn], show_progress="hidden", api_name=False)
 
     toggle_sidebar_btn.click(
         # Açıkken "◀" (kapat), kapalıyken "☰" (aç) ikonu göster.
         lambda vis: (gr.update(visible=not vis), not vis, gr.update(value="☰" if vis else "◀")),
-        sidebar_visible, [sidebar_col, sidebar_visible, toggle_sidebar_btn], api_name=False,
+        sidebar_visible, [sidebar_col, sidebar_visible, toggle_sidebar_btn], show_progress="hidden", api_name=False,
     )
 
     theme_state.change(None, theme_state, None, js=THEME_JS, api_name=False)
 
-    demo.load(load_default_city, None, [weather_panel, theme_state], api_name=False)
-    demo.load(None, None, geo_coords, js=GEO_JS, api_name=False)
-    geo_coords.change(apply_geolocation, geo_coords, [weather_panel, theme_state, sug1, sug2, sug3, sug4], api_name=False)
     ONBOARDING_OUTPUTS = [greeting_html, sug1, sug2, sug3, sug4]
+    STARTUP_ENABLE_OUTPUTS = [textbox, send_btn, sug1, sug2, sug3, sug4, startup_status]
 
-    # Anon-id (JS) → session listesi → onboarding kontrolü sırasıyla yüklenir.
+    # Geolocation bloklamayan ek bir akıştır: arka planda şehri/önerileri rafine eder.
+    demo.load(None, None, geo_coords, js=GEO_JS, api_name=False)
+    geo_coords.change(apply_geolocation, geo_coords, [weather_panel, theme_state, sug1, sug2, sug3, sug4], show_progress="hidden", api_name=False)
+
+    # Açılış zinciri: anon-id (JS) → varsayılan şehir hava durumu → oturum listesi →
+    # onboarding kontrolü → girişleri aç. Hepsi hazır olana kadar inputlar kilitli kalır.
     (demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
-        .then(load_sessions_on_start, anon_id_box, sessions_state, api_name=False)
-        .then(check_and_show_onboarding, anon_id_box, ONBOARDING_OUTPUTS, api_name=False))
+        .then(load_default_city, None, [weather_panel, theme_state], show_progress="hidden", api_name=False)
+        .then(load_sessions_on_start, anon_id_box, sessions_state, show_progress="hidden", api_name=False)
+        .then(check_and_show_onboarding, anon_id_box, ONBOARDING_OUTPUTS, show_progress="hidden", api_name=False)
+        .then(finish_startup, None, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
 
     pref_update_btn.click(
         trigger_preference_update,
         None,
         NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS,
+        show_progress="hidden",
         api_name=False,
     )
 
