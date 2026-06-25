@@ -43,8 +43,10 @@ _TURKISH_WORDS = {
 _current_language: str = "tr"
 _last_locations: list[str] = []
 _user_location: Optional[str] = None  # Kullanıcının bildirdiği güncel konum
+_map_wanted: bool = False  # LLM bu turda haritanın açılmasını istedi mi ([MAP] işareti)
 
 _LOC_TAG_RE = re.compile(r'\[LOC:([^\]]+)\]')
+_MAP_TAG_RE = re.compile(r'\[MAP\]', re.IGNORECASE)
 
 # Kullanıcının "şu an buradayım" tarzı konum bildirimlerini yakalayan kalıplar.
 # Yakalanan grup şehir adıdır (büyük harfle başlamalı → yaygın kelimeleri eler).
@@ -78,6 +80,16 @@ def get_last_locations() -> list[str]:
 def clear_last_location() -> None:
     global _last_locations
     _last_locations = []
+
+
+def get_map_wanted() -> bool:
+    """Bu turda LLM haritanın otomatik açılmasını istedi mi ([MAP] işareti)."""
+    return _map_wanted
+
+
+def clear_map_wanted() -> None:
+    global _map_wanted
+    _map_wanted = False
 
 
 def set_user_location(city: str) -> None:
@@ -584,6 +596,12 @@ def chat_skywise(messages: list[dict], anon_id: Optional[str] = None) -> Iterato
     global _last_locations
     _last_locations = [m.strip() for m in _LOC_TAG_RE.findall(final_text)]
     final_text = _LOC_TAG_RE.sub("", final_text).strip()
+
+    # MAP işareti: LLM bu turda haritanın otomatik açılmasını istedi mi? İşareti
+    # metinden temizle (kullanıcıya gösterilmez).
+    global _map_wanted
+    _map_wanted = bool(_MAP_TAG_RE.search(final_text))
+    final_text = _MAP_TAG_RE.sub("", final_text).strip()
 
     # Eksik-yanıt güvencesi: model bazen "... öneriler:" gibi içeriği olmayan tek satırlık
     # bir başlık üretip duruyor (boş başlık hatası). Bu imzayı yakala ve kullanıcıya kırık

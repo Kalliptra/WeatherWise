@@ -219,7 +219,19 @@ LOC ETİKETİ (harita sistemi için):
 venue_search KULLANMADAN önerdiğin her spesifik yer için (Emirgan Korusu, Galata Kulesi vb.)
 hemen arkasına [LOC:tam yer adı, şehir] etiketini yaz.
 Etiketler kullanıcıya gösterilmez, harita sistemi okur.
-venue_search araç çağrısı yaptıysan LOC etiketi YAZMA."""
+venue_search araç çağrısı yaptıysan LOC etiketi YAZMA.
+
+[MAP] İŞARETİ (haritayı otomatik açma):
+Harita VARSAYILAN OLARAK GİZLİDİR. Mekan/yer önerisi olduğunda kullanıcıya zaten bir
+"Haritada göster" butonu çıkar — yani harita her zaman tek tık uzakta.
+Yanıtının EN SONUNA [MAP] işaretini YALNIZCA harita gerçekten değer katacaksa yaz:
+- Kullanıcı fiilen bir yere gitmek/yön bulmak istiyorsa,
+- Mekanları konumsal olarak karşılaştırmak istiyorsa,
+- Ya da açıkça harita/konum istiyorsa ("haritada göster", "nerede", "yol tarifi",
+  "nereye gidebilirim", "yakınımda").
+[MAP] YAZMA: salt merak / "ne yapsam" okuması, tek bir yerden bahsetme, hava durumu
+sorusu, netleştirici soru turları.
+İşaret kullanıcıya gösterilmez; harita sistemi okur ve metinden silinir."""
 
 
 # ---- İngilizce prompt'lar ----
@@ -441,7 +453,19 @@ LOC TAG (for the map system):
 For every specific, navigable place recommended WITHOUT using venue_search
 (e.g. Hyde Park, Tower Bridge, Camden Market) add [LOC:full place name, city]
 immediately after that place name. Tags are hidden from the user.
-Add one tag per recommended place. If you called venue_search, do NOT add LOC tags."""
+Add one tag per recommended place. If you called venue_search, do NOT add LOC tags.
+
+[MAP] MARKER (auto-open the map):
+The map is HIDDEN BY DEFAULT. Whenever there are venue/place suggestions the user
+already gets a "Show on map" button — the map is always one click away.
+At the VERY END of your reply, add [MAP] ONLY when a map genuinely adds value:
+- the user actually wants to go somewhere / get directions,
+- the user wants to compare places spatially,
+- or the user explicitly asks for the map/location ("show on map", "where", "directions",
+  "where can I go", "near me").
+Do NOT add [MAP] for: pure curiosity / "what should I do" browsing, mentioning a single
+place, weather questions, clarifying-question turns.
+The marker is hidden from the user; the map system reads it and strips it from the text."""
 
 
 # ---- Itinerary prompt'ları ----

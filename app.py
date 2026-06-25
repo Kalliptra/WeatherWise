@@ -27,7 +27,9 @@ import gradio as gr  # noqa: E402
 from chat import (  # noqa: E402
     chat_skywise,
     clear_last_location,
+    clear_map_wanted,
     get_last_locations,
+    get_map_wanted,
     generate_next_suggestion,
     generate_location_suggestions,
     generate_session_title,
@@ -312,15 +314,15 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
     history.append({"role": "user", "content": user_message})
     history.append({"role": "assistant", "content": TYPING_INDICATOR})
 
-    yield gr.update(value=history, visible=True), gr.update(), gr.update(visible=False), gr.update(), gr.update(), gr.update(), gr.update(visible=False), [], gr.update(), remaining, qd, session_id, sessions
+    yield gr.update(value=history, visible=True), gr.update(), gr.update(visible=False), gr.update(), gr.update(), gr.update(visible=False), gr.update(visible=False), [], gr.update(), remaining, qd, session_id, sessions
 
     convo_for_agent = history[:-1]
     clear_last_weather()
     clear_last_venues()
     clear_last_location()
     clear_last_forecast()
+    clear_map_wanted()
     panel_sent = False
-    map_sent = False
 
     try:
         for partial in chat_skywise(convo_for_agent, anon_id=anon_id or None):
@@ -328,42 +330,24 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
                 return
             history[-1]["content"] = partial if partial else TYPING_INDICATOR
             weather = get_last_weather()
-            venues = get_last_venues()
 
             if weather is not None and not panel_sent:
                 panel_sent = True
                 yield history, gr.update(), gr.update(), render_weather_panel(weather), weather_to_theme(weather), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, sessions
-            elif venues and not map_sent:
-                map_sent = True
-                map_html = render_map_panel(venues)
-                yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=bool(map_html)), gr.update(visible=False), gr.update(), gr.update(), remaining, qd, session_id, sessions
             else:
                 yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, sessions
 
-        if not map_sent:
-            venues = get_last_venues()
-            if venues:
-                map_html = render_map_panel(venues)
-                if map_html:
-                    yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), gr.update(), gr.update(), remaining, qd, session_id, sessions
-                    map_sent = True
-
-        if not map_sent:
-            locs = get_last_locations()
-            if locs:
-                # Önerilen yerleri doğrudan haritada göster (butona gerek kalmadan).
-                map_html = _locations_to_map_html(locs)
-                if map_html:
-                    yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), locs, gr.update(), remaining, qd, session_id, sessions
-                    map_sent = True
-                else:
-                    # Geocode başarısızsa buton fallback'i göster.
-                    btn_label = (
-                        f"📍 {locs[0]} konumunu haritada göster"
-                        if len(locs) == 1
-                        else f"📍 Bunları haritada göster ({len(locs)} yer)"
-                    )
-                    yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=btn_label, visible=True), locs, gr.update(), remaining, qd, session_id, sessions
+        # Harita görünürlüğü: AI bu turda haritayı açmak istediyse ([MAP]) otomatik göster;
+        # istemediyse harita gizli kalsın ve "Haritada göster" butonu sunulsun.
+        venues = get_last_venues()
+        locs = get_last_locations()
+        if venues or locs:
+            map_html = render_map_panel(venues) if venues else _locations_to_map_html(locs)
+            if get_map_wanted() and map_html:
+                yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), locs, gr.update(), remaining, qd, session_id, sessions
+            elif map_html:
+                # Otomatik açma — kullanıcı isterse açsın diye buton göster.
+                yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(visible=False), gr.update(value="📍 Haritada göster", visible=True), locs, gr.update(), remaining, qd, session_id, sessions
 
         new_sessions = _persist_turn(history, session_id, sessions, user_message, anon_id)
 
@@ -526,9 +510,11 @@ def _locations_to_map_html(location_names) -> str:
     return render_locations_map(coords)
 
 
-def show_location_on_map(location_names):
-    """Lokasyon adlarını geocode edip haritada gösterir (tek veya çok)."""
-    map_html = _locations_to_map_html(location_names)
+def show_map_on_demand():
+    """'Haritada göster' butonu — bu turun mekanlarını/yerlerini haritada açar.
+    Önce venue verisini (puan/foto), yoksa LOC yer adlarını kullanır."""
+    venues = get_last_venues()
+    map_html = render_map_panel(venues) if venues else _locations_to_map_html(get_last_locations())
     if not map_html:
         return gr.update(), gr.update(visible=False)
     return gr.update(value=map_html, visible=True), gr.update(visible=False)
@@ -805,7 +791,7 @@ with gr.Blocks(
             time_ribbon = gr.HTML(value="", visible=False, elem_classes="time-ribbon-wrap")
             forecast_plot = gr.Plot(visible=False, elem_classes="forecast-plot", show_label=False)
             map_panel = gr.HTML(value="", visible=False)
-            show_loc_btn = gr.Button("📍 Konumu Haritada Göster", visible=False, elem_classes="loc-btn")
+            show_loc_btn = gr.Button("📍 Haritada Göster", visible=False, elem_classes="loc-btn")
 
         with gr.Column(scale=5, elem_classes="chat-surface"):
             with gr.Column(visible=True, elem_classes="empty-state") as empty_state:
@@ -893,7 +879,7 @@ with gr.Blocks(
     # tarayıcı geolocation'ı yeniden çek (gerçekten taşındıysa geo_coords.change tetiklenir).
     (new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
         .then(None, None, geo_coords, js=GEO_JS, api_name=False))
-    show_loc_btn.click(show_location_on_map, location_state, [map_panel, show_loc_btn], show_progress="hidden", api_name=False)
+    show_loc_btn.click(show_map_on_demand, None, [map_panel, show_loc_btn], show_progress="hidden", api_name=False)
 
     toggle_sidebar_btn.click(
         # Açıkken "◀" (kapat), kapalıyken "☰" (aç) ikonu göster.
