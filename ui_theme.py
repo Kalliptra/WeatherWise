@@ -142,7 +142,7 @@ ICONS = {
 
 # ---- Panel HTML ------------------------------------------------------------
 
-def render_weather_panel(weather: dict, uv=None) -> str:
+def render_weather_panel(weather: dict, uv=None, lang: str = "tr") -> str:
     theme = weather_to_theme(weather)
     icon = ICONS.get(theme, ICONS["clear-day"])
     temp = round(weather.get("temperature", 0))
@@ -168,7 +168,7 @@ def render_weather_panel(weather: dict, uv=None) -> str:
         '<div class="wx-panel">'
         f'<div class="wx-icon">{icon}</div>'
         f'<div class="wx-temp">{temp}°</div>'
-        f'<div class="wx-feels">Hissedilen {feels}°</div>'
+        f'<div class="wx-feels">{"Feels like" if lang == "en" else "Hissedilen"} {feels}°</div>'
         f'<div class="wx-cond">{condition}</div>'
         f'<div class="wx-city">{place}</div>'
         f"{chips_html}"
@@ -176,12 +176,13 @@ def render_weather_panel(weather: dict, uv=None) -> str:
     )
 
 
-def _fmt_review_count(n) -> str:
+def _fmt_review_count(n, lang: str = "tr") -> str:
     if n is None:
         return ""
+    label = "reviews" if lang == "en" else "yorum"
     if n >= 1000:
-        return f"{n / 1000:.1f}k yorum".replace(".0k", "k")
-    return f"{n} yorum"
+        return f"{n / 1000:.1f}k {label}".replace(".0k", "k")
+    return f"{n} {label}"
 
 
 def _map_iframe(center_lat: float, center_lon: float, venues_data: list[dict], zoom: int = 14) -> str:
@@ -289,7 +290,7 @@ venues.forEach(function(v) {{
     )
 
 
-def render_map_panel(venues: list[dict]) -> str:
+def render_map_panel(venues: list[dict], lang: str = "tr") -> str:
     """Venue kartları + koyu harita (iframe ile)."""
     if not venues:
         return ""
@@ -298,6 +299,11 @@ def render_map_panel(venues: list[dict]) -> str:
     if not valid:
         return ""
 
+    is_en = lang == "en"
+    open_txt = "Open" if is_en else "Açık"
+    closed_txt = "Closed" if is_en else "Kapalı"
+    route_txt = "Get Directions" if is_en else "Rota Al"
+
     center_lat = sum(v["lat"] for v in valid) / len(valid)
     center_lon = sum(v["lon"] for v in valid) / len(valid)
 
@@ -305,7 +311,7 @@ def render_map_panel(venues: list[dict]) -> str:
     cards_html = ""
     for v in valid:
         rating_str = f"⭐ {v['rating']}" if v.get("rating") else ""
-        reviews_str = _fmt_review_count(v.get("review_count"))
+        reviews_str = _fmt_review_count(v.get("review_count"), lang)
         meta_line = " · ".join([p for p in [rating_str, reviews_str] if p])
         dist_str = f"{v['distance_km']} km" if v.get("distance_km") is not None else ""
         maps_url = v.get("maps_url", "#")
@@ -314,9 +320,9 @@ def render_map_panel(venues: list[dict]) -> str:
         # Açık/Kapalı rozeti
         open_now = v.get("open_now")
         if open_now is True:
-            badge = '<span class="venue-badge venue-badge--open">Açık</span>'
+            badge = f'<span class="venue-badge venue-badge--open">{open_txt}</span>'
         elif open_now is False:
-            badge = '<span class="venue-badge venue-badge--closed">Kapalı</span>'
+            badge = f'<span class="venue-badge venue-badge--closed">{closed_txt}</span>'
         else:
             badge = ""
 
@@ -335,16 +341,16 @@ def render_map_panel(venues: list[dict]) -> str:
             f"{photo_html}"
             f'<div class="venue-card__head"><div class="venue-card__name">{safe_name}</div>{badge}</div>'
             f"{meta_html}{dist_html}"
-            f'<a class="venue-card__route" href="{maps_url}" target="_blank">🗺 Rota Al</a>'
+            f'<a class="venue-card__route" href="{maps_url}" target="_blank">🗺 {route_txt}</a>'
             "</div>"
         )
 
     # iframe için veri listesi (JSON güvenli)
     def _open_label(v):
         if v.get("open_now") is True:
-            return "✅ Açık"
+            return f"✅ {open_txt}"
         if v.get("open_now") is False:
-            return "❌ Kapalı"
+            return f"❌ {closed_txt}"
         return ""
 
     venues_data = [{
@@ -353,10 +359,10 @@ def render_map_panel(venues: list[dict]) -> str:
         "name": v["name"],
         "rating": v.get("rating"),
         "review_count": v.get("review_count"),
-        "review_count_str": _fmt_review_count(v.get("review_count")),
+        "review_count_str": _fmt_review_count(v.get("review_count"), lang),
         "open_label": _open_label(v),
         "maps_url": v.get("maps_url", ""),
-        "btn_label": "Rota Al",
+        "btn_label": route_txt,
         "open_popup": False,
     } for v in valid]
 
@@ -382,17 +388,18 @@ def render_location_map(name: str, lat: float, lon: float) -> str:
     return f'<div class="map-panel">{iframe_html}</div>'
 
 
-def render_locations_map(coords: list[tuple[str, float, float]]) -> str:
+def render_locations_map(coords: list[tuple[str, float, float]], lang: str = "tr") -> str:
     """Çok pinli harita — LLM'in önerdiği birden fazla yer için (iframe ile)."""
     if not coords:
         return ""
+    btn_label = "Get Directions" if lang == "en" else "Yol Tarifi Al"
     venues_data = []
     for name, lat, lon in coords:
         maps_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
         venues_data.append({
             "lat": lat, "lon": lon, "name": name,
             "rating": None, "review_count": None, "review_count_str": "",
-            "open_label": "", "maps_url": maps_url, "btn_label": "Yol Tarifi Al", "open_popup": False,
+            "open_label": "", "maps_url": maps_url, "btn_label": btn_label, "open_popup": False,
         })
     center_lat = sum(v["lat"] for v in venues_data) / len(venues_data)
     center_lon = sum(v["lon"] for v in venues_data) / len(venues_data)
@@ -482,7 +489,7 @@ def render_personalization_badge(level_info: dict, lang: str = "tr") -> str:
     )
 
 
-def render_forecast_chart(forecast: dict, horizon: int = 48):
+def render_forecast_chart(forecast: dict, horizon: int = 48, lang: str = "tr"):
     """tools.forecast.get_hourly_forecast() çıktısından Plotly figürü üretir.
 
     Sıcaklık çizgisi (sol eksen) + yağış olasılığı barları (sağ eksen), yağış
@@ -513,14 +520,21 @@ def render_forecast_chart(forecast: dict, horizon: int = 48):
     temps = [h["temp"] for h in upcoming]
     probs = [h["precip_prob"] for h in upcoming]
 
+    is_en = lang == "en"
+    precip_name = "Rain chance" if is_en else "Yağış olasılığı"
+    temp_name = "Temperature" if is_en else "Sıcaklık"
+    bar_hover = (
+        "%{x|%a %H:%M}<br>" + ("Rain %{y}%%" if is_en else "Yağış %%{y}") + "<extra></extra>"
+    )
+
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        x=xs, y=probs, name="Yağış olasılığı",
+        x=xs, y=probs, name=precip_name,
         marker_color="rgba(96,165,250,0.45)", yaxis="y2",
-        hovertemplate="%{x|%a %H:%M}<br>Yağış %%{y}<extra></extra>",
+        hovertemplate=bar_hover,
     ))
     fig.add_trace(go.Scatter(
-        x=xs, y=temps, name="Sıcaklık", mode="lines",
+        x=xs, y=temps, name=temp_name, mode="lines",
         line=dict(color="#f5a623", width=3, shape="spline"),
         hovertemplate="%{x|%a %H:%M}<br>%{y}°C<extra></extra>",
     ))
@@ -562,7 +576,7 @@ def render_forecast_chart(forecast: dict, horizon: int = 48):
         xaxis=dict(showgrid=False, tickformat="%a %H:%M", color="#8a93ad"),
         yaxis=dict(title="°C", showgrid=True, gridcolor="rgba(255,255,255,0.06)",
                    color="#8a93ad", zeroline=False),
-        yaxis2=dict(title="Yağış %", overlaying="y", side="right", range=[0, 100],
+        yaxis2=dict(title=("Rain %" if is_en else "Yağış %"), overlaying="y", side="right", range=[0, 100],
                     showgrid=False, color="#8a93ad"),
         bargap=0.1,
         hovermode="x unified",
@@ -1136,6 +1150,24 @@ button.clear-btn:hover, .clear-btn button:hover {
     border-radius: 12px !important;
 }
 .sidebar-toggle:hover, button.sidebar-toggle:hover {
+    border-color: var(--accent) !important;
+    color: var(--ink) !important;
+    background: var(--surface-hover) !important;
+}
+.lang-toggle, button.lang-toggle {
+    min-width: 64px !important;
+    max-width: 84px !important;
+    padding: 6px 12px !important;
+    font-size: 0.92rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    background: var(--surface-strong) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--ink-soft) !important;
+    border-radius: 12px !important;
+    flex: 0 0 auto !important;
+}
+.lang-toggle:hover, button.lang-toggle:hover {
     border-color: var(--accent) !important;
     color: var(--ink) !important;
     background: var(--surface-hover) !important;

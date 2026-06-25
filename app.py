@@ -25,6 +25,7 @@ import threading  # noqa: E402
 import gradio as gr  # noqa: E402
 
 from chat import (  # noqa: E402
+    _detect_language,
     chat_skywise,
     clear_last_location,
     clear_pending_nearby,
@@ -36,8 +37,11 @@ from chat import (  # noqa: E402
     generate_session_title,
     get_current_language,
     get_user_location,
+    set_current_language,
     set_user_location,
 )
+import i18n  # noqa: E402
+from i18n import t  # noqa: E402
 from tools.memory import (  # noqa: E402
     apply_feedback,
     get_activity_preferences,
@@ -48,6 +52,7 @@ from tools.memory import (  # noqa: E402
 )
 from ui_theme import (  # noqa: E402
     CUSTOM_CSS,
+    render_forecast_chart,
     render_locations_map,
     render_map_panel,
     render_panel_placeholder,
@@ -95,12 +100,9 @@ ANON_ID_JS = """
 }
 """
 
-ORNEK_SORULAR = [
-    "🏃 Spor & Fitness",
-    "🌿 Doğa & Yürüyüş",
-    "🎨 Kültür & Müze",
-    "🍽️ Yemek & Kafe",
-]
+# Arayüzün ilk açılışta (JS dil tespiti gelmeden önce) kullanacağı varsayılan dil.
+# Gerçek dil demo.load → LANG_JS ile tespit edilip apply_language ile uygulanır.
+DEFAULT_LANG = "tr"
 
 # Kullanıcının kategori butonlarından seçtiği metni aktivite tercihine eşleyen sözlük.
 # Tercih kaydı için kullanılır — key: buton etiketi, value: kayıt edilecek kategoriler.
@@ -115,25 +117,24 @@ CATEGORY_PREFS: dict[str, list[str]] = {
     "🍽️ Food & Café": ["food", "café"],
 }
 
-KARSILAMA_HTML = """
-<div class="greeting">
-    <div class="wave">🌤️</div>
-    <h2>Merhaba! Ben SkyWise</h2>
-    <p>Bulunduğun şehrin hava durumuna göre sana en uygun aktiviteleri öneririm.
-    Aşağıdan kategori seç ya da istediğini yaz — hemen öneriler hazırlayayım.</p>
-</div>
+# Kullanıcının UI dil tercihi (localStorage) ya da tarayıcı dilinden ilk dil tespiti.
+# Kaydedilmiş seçim öncelikli; yoksa navigator.language → tr/en (bulamazsa tr).
+LANG_JS = """
+() => {
+    try {
+        let saved = localStorage.getItem('skywise_lang');
+        if (saved === 'tr' || saved === 'en') return saved;
+        let nav = (navigator.language || navigator.userLanguage || '').toLowerCase();
+        if (nav.startsWith('en')) return 'en';
+        return 'tr';
+    } catch (e) {
+        return 'tr';
+    }
+}
 """
 
-ONBOARDING_HTML = """
-<div class="greeting">
-    <div class="wave">🌤️</div>
-    <h2>Merhaba! Ben SkyWise</h2>
-    <div class="onboarding-question">
-        <p><strong>Hangi tür aktiviteleri seversin?</strong></p>
-        <p>Aşağıdan bir kategori seç — bulunduğun yerin havasına göre hemen öneriler hazırlayayım.</p>
-    </div>
-</div>
-"""
+# Dil değiştirme butonuna basıldığında seçimi tarayıcıda kalıcı yapar.
+SAVE_LANG_JS = "(lang) => { try { localStorage.setItem('skywise_lang', lang); } catch (e) {} }"
 
 GEO_JS = """
 async () => {
@@ -153,13 +154,9 @@ async () => {
 
 THEME_JS = "(t) => { document.body.dataset.theme = t || 'clear-day'; }"
 
-# Yanıt beklenirken gösterilen "yazıyor..." üç nokta animasyonu + nazik etiket
-TYPING_INDICATOR = (
-    '<div class="typing-indicator">'
-    '<span></span><span></span><span></span>'
-    '<span class="typing-label">yanıt hazırlanıyor</span>'
-    "</div>"
-)
+# Yanıt beklenirken gösterilen "yazıyor..." göstergesi (dile duyarlı, i18n'den).
+typing_indicator = i18n.typing_indicator
+_is_typing = i18n.is_typing
 
 # Gradio'nun kendi koyu modunu zorla (dahili bileşenler de koyuya uysun) +
 # tema set edilene kadar varsayılan accent görünsün
@@ -245,24 +242,25 @@ FORCE_DARK_JS = """
 """
 
 
-def render_queued_display(queued: list) -> str:
+def render_queued_display(queued: list, lang: str = DEFAULT_LANG) -> str:
     if not queued:
         return ""
+    badge = t(lang, "queued_badge")
     items = "".join(
         f'<div class="queued-msg-row"><span class="queued-msg-text">{q}</span>'
-        f'<span class="queued-badge">🕒 Sırada</span></div>'
+        f'<span class="queued-badge">{badge}</span></div>'
         for q in queued
     )
     return f'<div class="queued-display">{items}</div>'
 
 
-def pre_submit(user_message: str, queued: list):
+def pre_submit(user_message: str, queued: list, lang: str = DEFAULT_LANG):
     msg = (user_message or "").strip()
     base = list(queued or [])
     if not msg:
-        return "", base, render_queued_display(base)
+        return "", base, render_queued_display(base, lang)
     new_queued = base + [msg]
-    return "", new_queued, render_queued_display(new_queued)
+    return "", new_queued, render_queued_display(new_queued, lang)
 
 
 def _persist_turn(history, session_id, sessions, user_message, anon_id):
@@ -293,20 +291,28 @@ def _persist_turn(history, session_id, sessions, user_message, anon_id):
         return sessions
 
 
-def respond_from_history(history, queued, session_id, sessions, anon_id):
+def respond_from_history(history, queued, session_id, sessions, anon_id, lang=DEFAULT_LANG):
     """Yields: (chatbot, textbox, empty_state, weather_panel, theme_state, map_panel,
     show_loc_btn, location_state, suggestion_box, queued_state, queued_display,
-    session_id_state, sessions_state)."""
+    session_id_state, sessions_state).
+
+    `lang` = aktif UI dili. Cevap dili (turn_lang) ise bağımsız belirlenir:
+    kart tıklamasıysa UI dili, yazılan mesajsa o mesajdan tespit edilir."""
     _abort.clear()
     if not queued:
         return
 
     user_message = queued[0]
     remaining = list(queued[1:])
-    qd = render_queued_display(remaining)
+    qd = render_queued_display(remaining, lang)
+
+    # Bu turun cevap dili: hazır kart tıklamasıysa kartın (UI) dili — metin tespiti
+    # kartlarda yanılabildiği için açıkça zorlanır; yazılan mesajda ise mesajdan tespit.
+    is_card = user_message in CATEGORY_PREFS
+    turn_lang = lang if is_card else _detect_language(user_message)
 
     # Kullanıcı bir kategori butonu seçtiyse tercihi Redis'e kaydet
-    if anon_id and user_message in CATEGORY_PREFS:
+    if anon_id and is_card:
         try:
             update_activity_preferences(anon_id, CATEGORY_PREFS[user_message])
         except Exception:
@@ -317,7 +323,7 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
 
     history = list(history or [])
     history.append({"role": "user", "content": user_message})
-    history.append({"role": "assistant", "content": TYPING_INDICATOR})
+    history.append({"role": "assistant", "content": typing_indicator(lang)})
 
     yield gr.update(value=history, visible=True), gr.update(), gr.update(visible=False), gr.update(), gr.update(), gr.update(visible=False), gr.update(visible=False), [], gr.update(), remaining, qd, session_id, sessions
 
@@ -330,15 +336,15 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
     panel_sent = False
 
     try:
-        for partial in chat_skywise(convo_for_agent, anon_id=anon_id or None):
+        for partial in chat_skywise(convo_for_agent, anon_id=anon_id or None, force_language=turn_lang):
             if _abort.is_set():
                 return
-            history[-1]["content"] = partial if partial else TYPING_INDICATOR
+            history[-1]["content"] = partial if partial else typing_indicator(lang)
             weather = get_last_weather()
 
             if weather is not None and not panel_sent:
                 panel_sent = True
-                yield history, gr.update(), gr.update(), render_weather_panel(weather), weather_to_theme(weather), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, sessions
+                yield history, gr.update(), gr.update(), render_weather_panel(weather, lang=get_current_language()), weather_to_theme(weather), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, sessions
             else:
                 yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, sessions
 
@@ -350,18 +356,18 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
         locs = get_last_locations()
         cat, city = get_pending_nearby()
         if venues:
-            map_html = render_map_panel(venues)
+            map_html = render_map_panel(venues, lang=get_current_language())
             if map_html:
                 yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), locs, gr.update(), remaining, qd, session_id, sessions
         elif cat and city:
-            yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(visible=False), gr.update(value="📍 Yakındaki yerleri göster", visible=True), locs, gr.update(), remaining, qd, session_id, sessions
+            yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(visible=False), gr.update(value=t(turn_lang, "nearby_btn"), visible=True), locs, gr.update(), remaining, qd, session_id, sessions
         elif locs:
-            yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(visible=False), gr.update(value="📍 Haritada göster", visible=True), locs, gr.update(), remaining, qd, session_id, sessions
+            yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(visible=False), gr.update(value=t(turn_lang, "show_on_map"), visible=True), locs, gr.update(), remaining, qd, session_id, sessions
 
         new_sessions = _persist_turn(history, session_id, sessions, user_message, anon_id)
 
         hint, suggestion = generate_next_suggestion(history)
-        default_placeholder = "Etkinlik sor... (örn: \"Bugün koşu için hava uygun mu?\")"
+        default_placeholder = t(lang, "placeholder")
         yield (
             gr.update(),
             gr.update(value="", placeholder=hint if hint else default_placeholder),
@@ -383,7 +389,8 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
         new_sessions = _persist_turn(history, session_id, sessions, user_message, anon_id)
         yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, new_sessions
     except Exception as e:
-        history[-1]["content"] = f"> ⚠️ Bir hata oluştu: {e}"
+        err = "An error occurred" if turn_lang == "en" else "Bir hata oluştu"
+        history[-1]["content"] = f"> ⚠️ {err}: {e}"
         new_sessions = _persist_turn(history, session_id, sessions, user_message, anon_id)
         yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, new_sessions
 
@@ -438,21 +445,29 @@ def on_select_session(sid, anon_id):
     venues = data.get("venues") or []
     locs = data.get("locations") or []
 
-    weather_html = render_weather_panel(weather) if weather else render_panel_placeholder("Bu sohbet için kayıtlı hava durumu yok.")
+    lang = get_current_language()
+    weather_html = render_weather_panel(weather, lang=lang) if weather else render_panel_placeholder(t(lang, "no_weather_session"))
     theme = weather_to_theme(weather) if weather else "clear-day"
 
     if venues:
-        map_html = render_map_panel(venues)
+        map_html = render_map_panel(venues, lang=lang)
         map_upd = gr.update(value=map_html, visible=bool(map_html))
         loc_btn_upd = gr.update(visible=False)
     else:
         map_upd = gr.update(value="", visible=False)
         if locs:
-            btn_label = (
-                f"📍 {locs[0]} konumunu haritada göster"
-                if len(locs) == 1
-                else f"📍 Bunları haritada göster ({len(locs)} yer)"
-            )
+            if lang == "en":
+                btn_label = (
+                    f"📍 Show {locs[0]} on map"
+                    if len(locs) == 1
+                    else f"📍 Show these on map ({len(locs)} places)"
+                )
+            else:
+                btn_label = (
+                    f"📍 {locs[0]} konumunu haritada göster"
+                    if len(locs) == 1
+                    else f"📍 Bunları haritada göster ({len(locs)} yer)"
+                )
             loc_btn_upd = gr.update(value=btn_label, visible=True)
         else:
             loc_btn_upd = gr.update(visible=False)
@@ -516,7 +531,7 @@ def _locations_to_map_html(location_names) -> str:
             continue
     if not coords:
         return ""
-    return render_locations_map(coords)
+    return render_locations_map(coords, lang=get_current_language())
 
 
 def show_map_on_demand():
@@ -530,13 +545,13 @@ def show_map_on_demand():
         except Exception:
             pass
     venues = get_last_venues()
-    map_html = render_map_panel(venues) if venues else _locations_to_map_html(get_last_locations())
+    map_html = render_map_panel(venues, lang=get_current_language()) if venues else _locations_to_map_html(get_last_locations())
     if not map_html:
         return gr.update(), gr.update(visible=False)
     return gr.update(value=map_html, visible=True), gr.update(visible=False)
 
 
-def check_and_show_onboarding(anon_id: str):
+def check_and_show_onboarding(anon_id: str, lang: str = DEFAULT_LANG):
     """Sayfa yüklenince çalışır. Tercihi olmayan (yeni) anonim kullanıcıya onboarding
     ekranı gösterir. Karşılama HTML'i günceller; butonlar kategori seçeneklerine dönüşür.
     Tercihi kayıtlı kullanıcılar için normal görünüm korunur.
@@ -548,9 +563,9 @@ def check_and_show_onboarding(anon_id: str):
     prefs = get_activity_preferences(anon_id)
     if prefs:
         return noop
-    cats = ORNEK_SORULAR
+    cats = i18n.cards(lang)
     return (
-        gr.update(value=ONBOARDING_HTML),
+        gr.update(value=i18n.onboarding_html(lang)),
         gr.update(value=cats[0]),
         gr.update(value=cats[1]),
         gr.update(value=cats[2]),
@@ -558,7 +573,7 @@ def check_and_show_onboarding(anon_id: str):
     )
 
 
-def trigger_preference_reset(anon_id):
+def trigger_preference_reset(anon_id, lang: str = DEFAULT_LANG):
     """'Tercihlerimi Sıfırla' — kayıtlı aktivite tercihlerini siler, sohbeti
     temizler ve onboarding ekranını yeniden gösterir.
     Dönüş: NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS (15 değer)
@@ -573,7 +588,7 @@ def trigger_preference_reset(anon_id):
     clear_last_location()
     clear_last_forecast()
     clear_last_weather()
-    cats = ORNEK_SORULAR
+    cats = i18n.cards(lang)
     weather_panel, theme = _location_weather_panel()
     return (
         gr.update(value=[], visible=False),   # chatbot
@@ -589,7 +604,7 @@ def trigger_preference_reset(anon_id):
         gr.update(value="", visible=False),    # time_ribbon
         weather_panel,                         # weather_panel
         theme,                                 # theme_state
-        gr.update(value=ONBOARDING_HTML),      # greeting_html
+        gr.update(value=i18n.onboarding_html(lang)),  # greeting_html
         gr.update(value=cats[0]),              # sug1
         gr.update(value=cats[1]),              # sug2
         gr.update(value=cats[2]),              # sug3
@@ -601,11 +616,12 @@ def load_default_city():
     # Geolocation zaten gerçek konumu uyguladıysa varsayılan şehirle üzerine yazma.
     if get_user_location():
         return gr.update(), gr.update()
+    lang = get_current_language()
     try:
         weather = get_weather(DEFAULT_CITY)
-        return render_weather_panel(weather), weather_to_theme(weather)
+        return render_weather_panel(weather, lang=lang), weather_to_theme(weather)
     except Exception:
-        return render_panel_placeholder("Hava durumu alınamadı."), "clear-day"
+        return render_panel_placeholder(t(lang, "weather_unavailable")), "clear-day"
 
 
 def _location_weather_panel():
@@ -615,20 +631,17 @@ def _location_weather_panel():
     city = get_user_location() or DEFAULT_CITY
     try:
         weather = get_weather(city)
-        return render_weather_panel(weather), weather_to_theme(weather)
+        return render_weather_panel(weather, lang=get_current_language()), weather_to_theme(weather)
     except Exception:
         return gr.update(), gr.update()
 
 
-DEFAULT_PLACEHOLDER = "Etkinlik sor... (örn: \"Bugün koşu için hava uygun mu?\")"
-
-
-def finish_startup():
+def finish_startup(lang: str = DEFAULT_LANG):
     """Açılış yüklemeleri (hava durumu + oturumlar + onboarding) bitince çağrılır.
     Girişleri aktif eder ve 'Hazırlanıyor' durumunu gizler.
     Dönüş: (textbox, send_btn, sug1, sug2, sug3, sug4, startup_status)."""
     return (
-        gr.update(interactive=True, placeholder=DEFAULT_PLACEHOLDER),
+        gr.update(interactive=True, placeholder=t(lang, "placeholder")),
         gr.update(interactive=True),
         gr.update(interactive=True),
         gr.update(interactive=True),
@@ -651,7 +664,7 @@ def set_idle():
 def update_forecast_chart():
     """Bu turda çekilen saatlik tahminden Plotly grafiği üretir (yoksa gizler)."""
     try:
-        fig = render_forecast_chart(get_last_forecast())
+        fig = render_forecast_chart(get_last_forecast(), lang=get_current_language())
     except Exception:
         fig = None
     if fig is None:
@@ -692,7 +705,7 @@ def _last_assistant_content(history):
     for msg in reversed(history or []):
         if isinstance(msg, dict) and msg.get("role") == "assistant":
             content = msg.get("content")
-            if content and content != TYPING_INDICATOR:
+            if content and not _is_typing(content):
                 return content
     return None
 
@@ -737,7 +750,7 @@ def on_feedback(history, anon_id, evt: gr.LikeData):
     if not isinstance(msg, dict):
         return no_change
     content = msg.get("content")
-    if msg.get("role") != "assistant" or not content or content == TYPING_INDICATOR:
+    if msg.get("role") != "assistant" or not content or _is_typing(content):
         return no_change
 
     lang = get_current_language()
@@ -745,12 +758,12 @@ def on_feedback(history, anon_id, evt: gr.LikeData):
     return render_personalization_badge(get_personalization_level(anon_id), lang), gr.update(visible=False)
 
 
-def apply_geolocation(coords: str, anon_id: str = ""):
+def apply_geolocation(coords: str, anon_id: str = "", lang: str = DEFAULT_LANG):
     """Tarayıcıdan gelen koordinatlarla hava durumunu konuma göre günceller.
 
     Onboarding sırasındaki (tercihi olmayan) kullanıcıda öneri butonlarına dokunmaz —
     kategori butonları korunur ve gereksiz LLM çağrısı yapılmaz. Yalnızca tercihi olan
-    kullanıcılar için konuma özel öneriler üretilir.
+    kullanıcılar için konuma özel öneriler üretilir (UI dilinde).
     """
     noop_sugs = (gr.update(), gr.update(), gr.update(), gr.update())
     try:
@@ -763,12 +776,74 @@ def apply_geolocation(coords: str, anon_id: str = ""):
             has_prefs = False
         if not has_prefs:
             # Onboarding aktif: kategori butonlarını koru, sadece hava/temayı güncelle.
-            return render_weather_panel(weather), weather_to_theme(weather), *noop_sugs
-        suggestions = generate_location_suggestions(weather["city"], weather["country"], weather)
+            return render_weather_panel(weather, lang=get_current_language()), weather_to_theme(weather), *noop_sugs
+        suggestions = generate_location_suggestions(weather["city"], weather["country"], weather, lang=lang)
         btn_updates = [gr.update(value=s) for s in suggestions]
-        return render_weather_panel(weather), weather_to_theme(weather), *btn_updates
+        return render_weather_panel(weather, lang=get_current_language()), weather_to_theme(weather), *btn_updates
     except Exception:
         return gr.update(), gr.update(), *noop_sugs
+
+
+# ---- Dil (UI) yardımcıları ----
+
+def _topbar_brand_html(lang: str) -> str:
+    return (
+        '<div class="topbar">'
+        '<div class="brand"><span class="brand-logo">◐</span> SkyWise</div>'
+        f'<div class="brand-tag">{t(lang, "brand_tag")}</div>'
+        "</div>"
+    )
+
+
+def _startup_status_html(lang: str) -> str:
+    return (
+        '<div class="startup-status"><span class="startup-dot"></span>'
+        f'{t(lang, "startup_status")}</div>'
+    )
+
+
+def _feedback_q_html(lang: str) -> str:
+    return f"<span class='feedback-q'>{t(lang, 'feedback_q')}</span>"
+
+
+def apply_language(lang: str):
+    """Seçilen UI diline göre tüm statik arayüz metinlerini günceller.
+    Dönüş sırası LANG_CHROME_OUTPUTS ile birebir aynıdır."""
+    lang = i18n.normalize_lang(lang)
+    cards = i18n.cards(lang)
+    return (
+        lang,                                          # lang_state
+        gr.update(value=t(lang, "lang_toggle")),       # lang_toggle_btn
+        gr.update(value=_topbar_brand_html(lang)),     # topbar_html
+        gr.update(value=i18n.greeting_html(lang)),     # greeting_html
+        gr.update(value=cards[0]),                     # sug1
+        gr.update(value=cards[1]),                     # sug2
+        gr.update(value=cards[2]),                     # sug3
+        gr.update(value=cards[3]),                     # sug4
+        gr.update(value=t(lang, "new_chat")),          # new_chat_btn
+        gr.update(value=t(lang, "reset_prefs")),       # pref_update_btn
+        gr.update(value=t(lang, "show_map_btn")),      # show_loc_btn
+        gr.update(value=_feedback_q_html(lang)),       # feedback_q_html
+        gr.update(value=t(lang, "fb_like")),           # fb_like
+        gr.update(value=t(lang, "fb_dislike")),        # fb_dislike
+        gr.update(value=t(lang, "send")),              # send_btn
+        gr.update(placeholder=t(lang, "placeholder")), # textbox
+        gr.update(value=_startup_status_html(lang)),   # startup_status
+    )
+
+
+def bootstrap_language(lang: str):
+    """İlk açılışta (tarayıcı/localStorage) tespit edilen dili uygular ve sohbet
+    dilini de bu dile tohumlar (henüz mesaj yokken yan paneller UI diline uysun)."""
+    lang = i18n.normalize_lang(lang)
+    set_current_language(lang)
+    return apply_language(lang)
+
+
+def toggle_language(current: str):
+    """Dil geçiş butonu — iki dil arasında geçiş yapar (UI dili)."""
+    new_lang = "en" if i18n.normalize_lang(current) == "tr" else "tr"
+    return apply_language(new_lang)
 
 
 with gr.Blocks(
@@ -784,13 +859,9 @@ with gr.Blocks(
 ) as demo:
     with gr.Row(elem_classes="topbar-row"):
         toggle_sidebar_btn = gr.Button("◀", elem_classes="sidebar-toggle", scale=0)
-        gr.HTML(
-            """
-            <div class="topbar">
-                <div class="brand"><span class="brand-logo">◐</span> SkyWise</div>
-                <div class="brand-tag">Hava durumuna göre kişisel aktivite asistanın</div>
-            </div>
-            """,
+        topbar_html = gr.HTML(_topbar_brand_html(DEFAULT_LANG))
+        lang_toggle_btn = gr.Button(
+            t(DEFAULT_LANG, "lang_toggle"), elem_classes="lang-toggle", scale=0
         )
 
     location_state = gr.State("")
@@ -800,17 +871,20 @@ with gr.Blocks(
     session_id_state = gr.State("")      # aktif session id; "" = henüz kaydedilmemiş yeni sohbet
     sessions_state = gr.State([])        # sidebar için session metadata listesi
     sidebar_visible = gr.State(True)
+    # UI dili: varsayılan + JS ile (localStorage/tarayıcı) doldurulan kutu
+    lang_state = gr.State(DEFAULT_LANG)
+    lang_box = gr.Textbox(visible=False)  # LANG_JS ile dolar → bootstrap_language
 
     with gr.Row(elem_classes="main-row"):
         with gr.Column(scale=1, min_width=200, elem_classes="session-sidebar", visible=True) as sidebar_col:
-            new_chat_btn = gr.Button("➕ Yeni Sohbet", elem_classes="new-chat-btn")
-            pref_update_btn = gr.Button("🔄 Tercihlerimi Sıfırla", elem_classes="new-chat-btn", size="sm")
-            pers_badge = gr.HTML(render_personalization_badge({}, "tr"), elem_classes="pers-badge")
+            new_chat_btn = gr.Button(t(DEFAULT_LANG, "new_chat"), elem_classes="new-chat-btn")
+            pref_update_btn = gr.Button(t(DEFAULT_LANG, "reset_prefs"), elem_classes="new-chat-btn", size="sm")
+            pers_badge = gr.HTML(render_personalization_badge({}, DEFAULT_LANG), elem_classes="pers-badge")
 
-            @gr.render(inputs=[sessions_state, session_id_state])
-            def render_sessions(sessions, active_id):
+            @gr.render(inputs=[sessions_state, session_id_state, lang_state])
+            def render_sessions(sessions, active_id, lang):
                 if not sessions:
-                    gr.HTML("<div class='session-empty'>Henüz sohbet yok</div>")
+                    gr.HTML(f"<div class='session-empty'>{t(lang, 'sessions_empty')}</div>")
                     return
                 for s in sessions:
                     sid = s.get("id")
@@ -852,17 +926,18 @@ with gr.Blocks(
             time_ribbon = gr.HTML(value="", visible=False, elem_classes="time-ribbon-wrap")
             forecast_plot = gr.Plot(visible=False, elem_classes="forecast-plot", show_label=False)
             map_panel = gr.HTML(value="", visible=False)
-            show_loc_btn = gr.Button("📍 Haritada Göster", visible=False, elem_classes="loc-btn")
+            show_loc_btn = gr.Button(t(DEFAULT_LANG, "show_map_btn"), visible=False, elem_classes="loc-btn")
 
         with gr.Column(scale=5, elem_classes="chat-surface"):
             with gr.Column(visible=True, elem_classes="empty-state") as empty_state:
-                greeting_html = gr.HTML(KARSILAMA_HTML)
+                greeting_html = gr.HTML(i18n.greeting_html(DEFAULT_LANG))
+                _init_cards = i18n.cards(DEFAULT_LANG)
                 with gr.Row():
-                    sug1 = gr.Button(ORNEK_SORULAR[0], elem_classes="suggestion-btn", interactive=False)
-                    sug2 = gr.Button(ORNEK_SORULAR[1], elem_classes="suggestion-btn", interactive=False)
+                    sug1 = gr.Button(_init_cards[0], elem_classes="suggestion-btn", interactive=False)
+                    sug2 = gr.Button(_init_cards[1], elem_classes="suggestion-btn", interactive=False)
                 with gr.Row():
-                    sug3 = gr.Button(ORNEK_SORULAR[2], elem_classes="suggestion-btn", interactive=False)
-                    sug4 = gr.Button(ORNEK_SORULAR[3], elem_classes="suggestion-btn", interactive=False)
+                    sug3 = gr.Button(_init_cards[2], elem_classes="suggestion-btn", interactive=False)
+                    sug4 = gr.Button(_init_cards[3], elem_classes="suggestion-btn", interactive=False)
 
             chatbot = gr.Chatbot(
                 value=[],
@@ -877,22 +952,21 @@ with gr.Blocks(
             )
 
             with gr.Row(visible=False, elem_classes="feedback-row") as feedback_row:
-                gr.HTML("<span class='feedback-q'>Bu öneri işine yaradı mı?</span>")
-                fb_like = gr.Button("👍 Beğendim", elem_classes="fb-btn")
-                fb_dislike = gr.Button("👎 Pek değil", elem_classes="fb-btn")
+                feedback_q_html = gr.HTML(_feedback_q_html(DEFAULT_LANG))
+                fb_like = gr.Button(t(DEFAULT_LANG, "fb_like"), elem_classes="fb-btn")
+                fb_dislike = gr.Button(t(DEFAULT_LANG, "fb_dislike"), elem_classes="fb-btn")
 
             queued_display = gr.HTML(value="", elem_classes="queued-display-wrapper")
 
             startup_status = gr.HTML(
-                '<div class="startup-status"><span class="startup-dot"></span>'
-                "Senin için hava durumu ve öneriler hazırlanıyor…</div>",
+                _startup_status_html(DEFAULT_LANG),
                 visible=True,
                 elem_classes="startup-status-wrapper",
             )
 
             with gr.Row(elem_classes="chat-input-row"):
                 textbox = gr.Textbox(
-                    placeholder="Hazırlanıyor…",
+                    placeholder=t(DEFAULT_LANG, "textbox_loading"),
                     scale=9,
                     container=False,
                     lines=1,
@@ -900,7 +974,7 @@ with gr.Blocks(
                     show_label=False,
                     interactive=False,
                 )
-                send_btn = gr.Button("Gönder ↗", variant="primary", scale=1, interactive=False)
+                send_btn = gr.Button(t(DEFAULT_LANG, "send"), variant="primary", scale=1, interactive=False)
 
     gr.Markdown(
         """
@@ -921,16 +995,18 @@ with gr.Blocks(
     )
 
     RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display, session_id_state, sessions_state]
-    RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, anon_id_box]
+    RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, anon_id_box, lang_state]
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
     NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, forecast_plot, time_ribbon, weather_panel, theme_state]
+    # Dil geçişinde güncellenecek tüm statik arayüz bileşenleri (apply_language sırası ile birebir).
+    LANG_CHROME_OUTPUTS = [lang_state, lang_toggle_btn, topbar_html, greeting_html, sug1, sug2, sug3, sug4, new_chat_btn, pref_update_btn, show_loc_btn, feedback_q_html, fb_like, fb_dislike, send_btn, textbox, startup_status]
 
     # Feedback satırı yalnızca gerçek bir aktivite önerisi yapıldığında görünür;
     # netleştirme sorusu / yalnızca-hava turlarında gizli kalır.
     reveal_feedback = lambda: gr.update(visible=did_last_turn_recommend())
     hide_feedback = lambda: gr.update(visible=False)
     for trigger in (textbox.submit, send_btn.click):
-        (trigger(pre_submit, [textbox, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
+        (trigger(pre_submit, [textbox, queued_state, lang_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
          .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
          .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
@@ -938,7 +1014,7 @@ with gr.Blocks(
          .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
     for sug in (sug1, sug2, sug3, sug4):
-        (sug.click(pre_submit, [sug, queued_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
+        (sug.click(pre_submit, [sug, queued_state, lang_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
          .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
          .then(update_forecast_chart, None, forecast_plot, show_progress="hidden", api_name=False)
@@ -964,6 +1040,10 @@ with gr.Blocks(
         sidebar_visible, [sidebar_col, sidebar_visible, toggle_sidebar_btn], show_progress="hidden", api_name=False,
     )
 
+    # Dil geçiş butonu: tüm statik arayüzü çevirir, ardından seçimi localStorage'a yazar.
+    (lang_toggle_btn.click(toggle_language, lang_state, LANG_CHROME_OUTPUTS, show_progress="hidden", api_name=False)
+        .then(None, lang_state, None, js=SAVE_LANG_JS, api_name=False))
+
     theme_state.change(None, theme_state, None, js=THEME_JS, api_name=False)
 
     ONBOARDING_OUTPUTS = [greeting_html, sug1, sug2, sug3, sug4]
@@ -974,9 +1054,13 @@ with gr.Blocks(
     # Ayrıca güvenlik ağı: Python load'ın `.then`'i güvenilir tetiklenir; anon_id.change
     # zinciri herhangi bir sebeple çalışmasa bile girişler burada kesin açılır.
     (demo.load(load_default_city, None, [weather_panel, theme_state], show_progress="hidden", api_name=False)
-        .then(finish_startup, None, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
+        .then(finish_startup, lang_box, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
     demo.load(None, None, geo_coords, js=GEO_JS, api_name=False)
-    geo_coords.change(apply_geolocation, [geo_coords, anon_id_box], [weather_panel, theme_state, sug1, sug2, sug3, sug4], show_progress="hidden", api_name=False)
+    geo_coords.change(apply_geolocation, [geo_coords, anon_id_box, lang_state], [weather_panel, theme_state, sug1, sug2, sug3, sug4], show_progress="hidden", api_name=False)
+
+    # UI dili: localStorage/tarayıcı tespiti (LANG_JS) → bootstrap_language tüm chrome'u çevirir.
+    demo.load(None, None, lang_box, js=LANG_JS, api_name=False)
+    lang_box.change(bootstrap_language, lang_box, LANG_CHROME_OUTPUTS, show_progress="hidden", api_name=False)
 
     # Giriş kilidi yalnızca hızlı Redis okumalarına bağlıdır: anon-id (JS) → oturum listesi →
     # onboarding kontrolü → girişleri aç. Hava durumu beklenmez (skeleton ile dolar).
@@ -987,13 +1071,13 @@ with gr.Blocks(
     # ile aynı kanıtlanmış desen) JS değeri set edince güvenilir tetiklenir.
     demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
     (anon_id_box.change(load_sessions_on_start, anon_id_box, sessions_state, show_progress="hidden", api_name=False)
-        .then(check_and_show_onboarding, anon_id_box, ONBOARDING_OUTPUTS, show_progress="hidden", api_name=False)
+        .then(check_and_show_onboarding, [anon_id_box, lang_box], ONBOARDING_OUTPUTS, show_progress="hidden", api_name=False)
         .then(refresh_badge, anon_id_box, pers_badge, show_progress="hidden", api_name=False)
-        .then(finish_startup, None, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
+        .then(finish_startup, lang_box, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
 
     (pref_update_btn.click(
         trigger_preference_reset,
-        anon_id_box,
+        [anon_id_box, lang_state],
         NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS,
         show_progress="hidden",
         api_name=False,

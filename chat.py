@@ -127,6 +127,14 @@ def get_current_language() -> str:
     return _current_language
 
 
+def set_current_language(lang: str) -> None:
+    """Sohbet dilini açıkça ayarlar (ör. açılışta UI dilini tohumlamak için).
+    Bir sonraki kullanıcı mesajı/kart tıklaması bu değeri yeniden belirleyebilir."""
+    global _current_language
+    if lang in ("tr", "en"):
+        _current_language = lang
+
+
 # ---- Intent Router ----
 
 _WEATHER_ONLY_TR = frozenset([
@@ -354,14 +362,23 @@ _chat_worker = create_react_agent(
 
 # ---- Yardımcılar ----
 
-def _gradio_to_lc_messages(messages: list[dict], anon_id: Optional[str] = None) -> list:
+def _gradio_to_lc_messages(
+    messages: list[dict],
+    anon_id: Optional[str] = None,
+    force_language: Optional[str] = None,
+) -> list:
     global _current_language
 
-    # Dil tespiti: ilk kullanıcı mesajından
-    for m in messages:
-        if m.get("role") == "user" and (m.get("content") or "").strip():
-            _current_language = _detect_language(m["content"])
-            break
+    if force_language:
+        # Çağıran tur dilini açıkça belirtti (ör. kart tıklaması = UI dili).
+        # Otomatik tespiti atla — dil UI'dan bağımsız ve kararlı olsun.
+        _current_language = force_language
+    else:
+        # Dil tespiti: ilk kullanıcı mesajından
+        for m in messages:
+            if m.get("role") == "user" and (m.get("content") or "").strip():
+                _current_language = _detect_language(m["content"])
+                break
 
     base_prompt = get_prompt("chat", _current_language)
     memory_block = format_memory_block(load_memory(anon_id), _current_language)
@@ -533,19 +550,26 @@ def _generate_itinerary_for_chat(
 
 # ---- Public API ----
 
-def chat_skywise(messages: list[dict], anon_id: Optional[str] = None) -> Iterator[str]:
+def chat_skywise(
+    messages: list[dict],
+    anon_id: Optional[str] = None,
+    force_language: Optional[str] = None,
+) -> Iterator[str]:
     """Sohbet tabanlı SkyWise asistanı.
 
     Girdi: Gradio Chatbot(type="messages") formatı —
         [{"role": "user"|"assistant", "content": str}, ...]
     Çıktı: kümülatif metin parçaları (streaming) — son chunk tam yanıttır.
+
+    force_language verilirse (ör. kart tıklaması = UI dili) cevap dili o dile
+    sabitlenir; aksi halde kullanıcının yazdığı mesajdan otomatik tespit edilir.
     """
     # Bu turun öneri durumu sıfırlanır; yalnızca gerçek öneri üretildiğinde True olur.
     global _last_turn_recommended
     _last_turn_recommended = False
 
     # Dil tespiti + LangChain mesajlarına dönüşüm (bu _current_language'ı günceller)
-    lc_messages = _gradio_to_lc_messages(messages, anon_id=anon_id)
+    lc_messages = _gradio_to_lc_messages(messages, anon_id=anon_id, force_language=force_language)
     n_original = len(lc_messages)
 
     # Intent sınıflandırma (dil güncel olduktan sonra)
@@ -694,9 +718,13 @@ _GENEL_ONERILER = [
 ]
 
 
-def generate_location_suggestions(city: str, country: str, weather: dict) -> list[str]:
+def generate_location_suggestions(
+    city: str, country: str, weather: dict, lang: Optional[str] = None
+) -> list[str]:
     try:
-        lang_instruction = "Türkçe yaz." if country == "TR" else "Write in English."
+        # Öneri dili: açıkça verilen UI dili (varsa) önceliklidir; yoksa ülkeden türetilir.
+        use_tr = (lang == "tr") if lang in ("tr", "en") else (country == "TR")
+        lang_instruction = "Türkçe yaz." if use_tr else "Write in English."
         temp = weather.get("temperature", "?")
         condition = weather.get("condition", "")
         humidity = weather.get("humidity", "")
@@ -708,7 +736,7 @@ def generate_location_suggestions(city: str, country: str, weather: dict) -> lis
             + (f", nem %{humidity}" if humidity else "")
             + (f", rüzgar {wind} km/h" if wind else "")
         )
-        if country == "TR":
+        if use_tr:
             examples = (
                 f"'{city}'de bu havada sabah koşusu yapılır mı?', "
                 f"'Bugün {temp}°C ile dışarıda oturmak mantıklı mı?', "
