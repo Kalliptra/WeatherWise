@@ -27,9 +27,9 @@ import gradio as gr  # noqa: E402
 from chat import (  # noqa: E402
     chat_skywise,
     clear_last_location,
-    clear_map_wanted,
+    clear_pending_nearby,
     get_last_locations,
-    get_map_wanted,
+    get_pending_nearby,
     generate_next_suggestion,
     generate_location_suggestions,
     generate_session_title,
@@ -59,7 +59,7 @@ from tools.weather import (  # noqa: E402
     get_weather,
     get_weather_by_coords,
 )
-from tools.venue import clear_last_venues, geocode_city, get_last_venues  # noqa: E402
+from tools.venue import clear_last_venues, find_venues, geocode_city, get_last_venues  # noqa: E402
 from tools.sessions import (  # noqa: E402
     delete_session,
     list_sessions,
@@ -321,7 +321,7 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
     clear_last_venues()
     clear_last_location()
     clear_last_forecast()
-    clear_map_wanted()
+    clear_pending_nearby()
     panel_sent = False
 
     try:
@@ -337,17 +337,21 @@ def respond_from_history(history, queued, session_id, sessions, anon_id):
             else:
                 yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, sessions
 
-        # Harita görünürlüğü: AI bu turda haritayı açmak istediyse ([MAP]) otomatik göster;
-        # istemediyse harita gizli kalsın ve "Haritada göster" butonu sunulsun.
+        # Harita görünürlüğü (deterministik):
+        #  - venue_search somut mekan döndürdüyse öneri konuma bağlıdır → harita otomatik açılır.
+        #  - Genel aktivite ([NEARBY:kategori]) → "Yakındaki yerleri göster" butonu (tık: arama + harita).
+        #  - Anılan spesifik yer adları (LOC, venue yok) → "Haritada göster" butonu.
         venues = get_last_venues()
         locs = get_last_locations()
-        if venues or locs:
-            map_html = render_map_panel(venues) if venues else _locations_to_map_html(locs)
-            if get_map_wanted() and map_html:
+        cat, city = get_pending_nearby()
+        if venues:
+            map_html = render_map_panel(venues)
+            if map_html:
                 yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(value=map_html, visible=True), gr.update(visible=False), locs, gr.update(), remaining, qd, session_id, sessions
-            elif map_html:
-                # Otomatik açma — kullanıcı isterse açsın diye buton göster.
-                yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(visible=False), gr.update(value="📍 Haritada göster", visible=True), locs, gr.update(), remaining, qd, session_id, sessions
+        elif cat and city:
+            yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(visible=False), gr.update(value="📍 Yakındaki yerleri göster", visible=True), locs, gr.update(), remaining, qd, session_id, sessions
+        elif locs:
+            yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(visible=False), gr.update(value="📍 Haritada göster", visible=True), locs, gr.update(), remaining, qd, session_id, sessions
 
         new_sessions = _persist_turn(history, session_id, sessions, user_message, anon_id)
 
@@ -511,8 +515,15 @@ def _locations_to_map_html(location_names) -> str:
 
 
 def show_map_on_demand():
-    """'Haritada göster' butonu — bu turun mekanlarını/yerlerini haritada açar.
-    Önce venue verisini (puan/foto), yoksa LOC yer adlarını kullanır."""
+    """Harita butonu — bu turun mekanlarını/yerlerini haritada açar.
+    Genel aktivitede ([NEARBY]) önce kategoriyi konuma göre arar; aksi halde
+    mevcut venue verisini (puan/foto), yoksa LOC yer adlarını kullanır."""
+    cat, city = get_pending_nearby()
+    if cat and city and not get_last_venues():
+        try:
+            find_venues(city, cat)  # _LAST_VENUES doldurur (yüksek puanlı mekanlar)
+        except Exception:
+            pass
     venues = get_last_venues()
     map_html = render_map_panel(venues) if venues else _locations_to_map_html(get_last_locations())
     if not map_html:

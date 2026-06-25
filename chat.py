@@ -43,10 +43,12 @@ _TURKISH_WORDS = {
 _current_language: str = "tr"
 _last_locations: list[str] = []
 _user_location: Optional[str] = None  # Kullanıcının bildirdiği güncel konum
-_map_wanted: bool = False  # LLM bu turda haritanın açılmasını istedi mi ([MAP] işareti)
+# Genel/soyut aktivite önerisinde, kullanıcı isterse yakında arama yapması için
+# bekleyen (kategori, şehir). [NEARBY:kategori] işaretinden doldurulur.
+_pending_nearby: tuple[Optional[str], Optional[str]] = (None, None)
 
 _LOC_TAG_RE = re.compile(r'\[LOC:([^\]]+)\]')
-_MAP_TAG_RE = re.compile(r'\[MAP\]', re.IGNORECASE)
+_NEARBY_TAG_RE = re.compile(r'\[NEARBY:([^\]]+)\]', re.IGNORECASE)
 
 # Kullanıcının "şu an buradayım" tarzı konum bildirimlerini yakalayan kalıplar.
 # Yakalanan grup şehir adıdır (büyük harfle başlamalı → yaygın kelimeleri eler).
@@ -82,14 +84,15 @@ def clear_last_location() -> None:
     _last_locations = []
 
 
-def get_map_wanted() -> bool:
-    """Bu turda LLM haritanın otomatik açılmasını istedi mi ([MAP] işareti)."""
-    return _map_wanted
+def get_pending_nearby() -> tuple[Optional[str], Optional[str]]:
+    """Genel aktivite önerisinde 'Yakındaki yerleri göster' butonu için bekleyen
+    (kategori, şehir). Yoksa (None, None)."""
+    return _pending_nearby
 
 
-def clear_map_wanted() -> None:
-    global _map_wanted
-    _map_wanted = False
+def clear_pending_nearby() -> None:
+    global _pending_nearby
+    _pending_nearby = (None, None)
 
 
 def set_user_location(city: str) -> None:
@@ -597,11 +600,20 @@ def chat_skywise(messages: list[dict], anon_id: Optional[str] = None) -> Iterato
     _last_locations = [m.strip() for m in _LOC_TAG_RE.findall(final_text)]
     final_text = _LOC_TAG_RE.sub("", final_text).strip()
 
-    # MAP işareti: LLM bu turda haritanın otomatik açılmasını istedi mi? İşareti
+    # NEARBY işareti: genel/soyut aktivite önerisinde LLM, kullanıcı isterse yakında
+    # arama yapması için bir kategori önerir. Şehri bu turun odak şehriyle çöz; etiketi
     # metinden temizle (kullanıcıya gösterilmez).
-    global _map_wanted
-    _map_wanted = bool(_MAP_TAG_RE.search(final_text))
-    final_text = _MAP_TAG_RE.sub("", final_text).strip()
+    global _pending_nearby
+    _nearby_match = _NEARBY_TAG_RE.search(final_text)
+    if _nearby_match:
+        _nearby_cat = _nearby_match.group(1).strip()
+        _nearby_city = (
+            _focus_city_from_tools(new_messages)
+            or _user_location
+            or (get_last_weather() or {}).get("city")
+        )
+        _pending_nearby = (_nearby_cat or None, _nearby_city or None)
+    final_text = _NEARBY_TAG_RE.sub("", final_text).strip()
 
     # Eksik-yanıt güvencesi: model bazen "... öneriler:" gibi içeriği olmayan tek satırlık
     # bir başlık üretip duruyor (boş başlık hatası). Bu imzayı yakala ve kullanıcıya kırık

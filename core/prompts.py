@@ -221,17 +221,18 @@ hemen arkasına [LOC:tam yer adı, şehir] etiketini yaz.
 Etiketler kullanıcıya gösterilmez, harita sistemi okur.
 venue_search araç çağrısı yaptıysan LOC etiketi YAZMA.
 
-[MAP] İŞARETİ (haritayı otomatik açma):
-Harita VARSAYILAN OLARAK GİZLİDİR. Mekan/yer önerisi olduğunda kullanıcıya zaten bir
-"Haritada göster" butonu çıkar — yani harita her zaman tek tık uzakta.
-Yanıtının EN SONUNA [MAP] işaretini YALNIZCA harita gerçekten değer katacaksa yaz:
-- Kullanıcı fiilen bir yere gitmek/yön bulmak istiyorsa,
-- Mekanları konumsal olarak karşılaştırmak istiyorsa,
-- Ya da açıkça harita/konum istiyorsa ("haritada göster", "nerede", "yol tarifi",
-  "nereye gidebilirim", "yakınımda").
-[MAP] YAZMA: salt merak / "ne yapsam" okuması, tek bir yerden bahsetme, hava durumu
-sorusu, netleştirici soru turları.
-İşaret kullanıcıya gösterilmez; harita sistemi okur ve metinden silinir."""
+HARİTA / [NEARBY] İŞARETİ:
+Konuma bağlı öneriler (kullanıcı somut bir mekan/kategori istediğinde — "kafe öner",
+"müze öner", "nereye gidebilirim", "en iyi kafeler") için venue_search çağır; bunlar
+otomatik olarak haritada gösterilir.
+AMA önerin GENEL/SOYUT bir aktivite ise ve kullanıcı seni belirli mekanlara götürmeni
+açıkça istemediyse (örn. sohbet tonunda "bugün bir kahve içmeye ne dersin", "biraz
+yürü/dinlen", "spor yapmaya ne dersin") → venue_search ÇAĞIRMA. Bunun yerine yanıtının
+EN SONUNA [NEARBY:kategori] yaz; kategori bilinen TEK bir tür olsun:
+kafe, müze, park, restoran, manzara, plaj, sinema, kütüphane, sanat galerisi, alışveriş, spor salonu.
+Bu işaret kullanıcıya "Yakındaki yerleri göster" butonu sunar (kullanıcı isterse açar);
+kullanıcıya gösterilmez, harita sistemi okur ve metinden silinir.
+venue_search çağırdıysan [NEARBY] YAZMA — ikisi birlikte olmaz."""
 
 
 # ---- İngilizce prompt'lar ----
@@ -455,17 +456,18 @@ For every specific, navigable place recommended WITHOUT using venue_search
 immediately after that place name. Tags are hidden from the user.
 Add one tag per recommended place. If you called venue_search, do NOT add LOC tags.
 
-[MAP] MARKER (auto-open the map):
-The map is HIDDEN BY DEFAULT. Whenever there are venue/place suggestions the user
-already gets a "Show on map" button — the map is always one click away.
-At the VERY END of your reply, add [MAP] ONLY when a map genuinely adds value:
-- the user actually wants to go somewhere / get directions,
-- the user wants to compare places spatially,
-- or the user explicitly asks for the map/location ("show on map", "where", "directions",
-  "where can I go", "near me").
-Do NOT add [MAP] for: pure curiosity / "what should I do" browsing, mentioning a single
-place, weather questions, clarifying-question turns.
-The marker is hidden from the user; the map system reads it and strips it from the text."""
+MAP / [NEARBY] MARKER:
+For location-based recommendations (the user asks for concrete places/categories —
+"recommend cafes", "suggest museums", "where can I go", "best cafes") call venue_search;
+those are shown on the map automatically.
+BUT if your suggestion is a GENERAL/ABSTRACT activity and the user did not explicitly ask
+to be taken to specific places (e.g. conversationally "how about grabbing a coffee today",
+"take a short walk / relax", "how about some sport") → do NOT call venue_search. Instead,
+at the VERY END of your reply add [NEARBY:category], where category is ONE known type:
+cafe, museum, park, restaurant, viewpoint, beach, cinema, library, gallery, shopping, gym.
+This marker offers the user a "Show nearby places" button (they open it if they want);
+it is hidden from the user, read by the map system and stripped from the text.
+If you called venue_search, do NOT add [NEARBY] — never both."""
 
 
 # ---- Itinerary prompt'ları ----
