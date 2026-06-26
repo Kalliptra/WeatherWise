@@ -61,6 +61,7 @@ from ui_theme import (  # noqa: E402
     render_locations_map,
     render_map_panel,
     render_panel_placeholder,
+    render_favorites_html,
     render_panel_skeleton,
     render_personalization_badge,
     render_rain_alert,
@@ -847,11 +848,35 @@ def make_calendar_file(history):
 
 # ---- Favori mekan handler'ları ----
 
-def load_favorites_on_start(anon_id):
+# Yönet-dropdown'unda mekan adı+şehri tek değerde taşımak için ayraç (görünmez).
+_FAV_SEP = "␟"
+
+
+def _fav_view(anon_id):
+    """Favori listesinin GÖRÜNÜMÜNÜ üretir (statik HTML — @gr.render'a bağlı değil).
+    Dönüş FAV_VIEW_OUTPUTS ile birebir: (fav_section, fav_manage_row, fav_manage_dd)."""
+    favs = []
     try:
-        return list_favorites(anon_id)
+        favs = list_favorites(anon_id)
     except Exception:
-        return []
+        favs = []
+    html = render_favorites_html(favs, get_current_language())
+    if not favs:
+        return gr.update(value=""), gr.update(visible=False), gr.update(choices=[], value=None)
+    choices = [
+        (f.get("name", "") + (f" · {f['city']}" if f.get("city") else ""),
+         f.get("name", "") + _FAV_SEP + f.get("city", ""))
+        for f in favs
+    ]
+    return (
+        gr.update(value=html),
+        gr.update(visible=True),
+        gr.update(choices=choices, value=choices[0][1]),
+    )
+
+
+def load_favorites_on_start(anon_id):
+    return _fav_view(anon_id)
 
 
 def update_fav_controls(lang=DEFAULT_LANG):
@@ -865,42 +890,54 @@ def update_fav_controls(lang=DEFAULT_LANG):
 
 
 def on_save_favorite(selected_name, anon_id):
-    """Seçili mekanı (bu turun venue verisinden) favorilere ekler ve listeyi döndürür."""
-    if not anon_id or not selected_name:
-        return gr.update()
-    venue = next((v for v in (get_last_venues() or []) if v.get("name") == selected_name), None)
-    if not venue:
-        return gr.update()
-    city = (get_last_weather() or {}).get("city") or (get_user_location() or "")
+    """Seçili mekanı (bu turun venue verisinden) favorilere ekler, listeyi yeniler.
+    Seçim boşsa bu turun ilk mekanına düşer (sessiz no-op'u önler)."""
+    if anon_id:
+        venues = get_last_venues() or []
+        venue = next((v for v in venues if v.get("name") == selected_name), None) or (venues[0] if venues else None)
+        if venue:
+            city = (get_last_weather() or {}).get("city") or (get_user_location() or "")
+            try:
+                add_favorite(anon_id, {
+                    "name": venue.get("name"),
+                    "city": city,
+                    "category": venue.get("type", ""),
+                    "lat": venue.get("lat"),
+                    "lon": venue.get("lon"),
+                    "maps_url": venue.get("maps_url", ""),
+                })
+                gr.Info(t(get_current_language(), "fav_saved"))
+            except Exception:
+                pass
+    return _fav_view(anon_id)
+
+
+def _split_fav(sel):
+    """Yönet-dropdown değerini (ad␟şehir) ad ve şehre ayırır."""
+    if not sel:
+        return "", ""
+    parts = str(sel).split(_FAV_SEP, 1)
+    return parts[0], (parts[1] if len(parts) > 1 else "")
+
+
+def on_fav_toggle(sel, anon_id):
+    name, city = _split_fav(sel)
     try:
-        add_favorite(anon_id, {
-            "name": venue.get("name"),
-            "city": city,
-            "category": venue.get("type", ""),
-            "lat": venue.get("lat"),
-            "lon": venue.get("lon"),
-            "maps_url": venue.get("maps_url", ""),
-        })
-        gr.Info(t(get_current_language(), "fav_saved"))
-        return list_favorites(anon_id)
+        if name:
+            toggle_favorite_done(anon_id, name, city)
     except Exception:
-        return gr.update()
+        pass
+    return _fav_view(anon_id)
 
 
-def on_toggle_favorite(name, city, anon_id):
+def on_fav_remove(sel, anon_id):
+    name, city = _split_fav(sel)
     try:
-        toggle_favorite_done(anon_id, name, city)
-        return list_favorites(anon_id)
+        if name:
+            remove_favorite(anon_id, name, city)
     except Exception:
-        return gr.update()
-
-
-def on_remove_favorite(name, city, anon_id):
-    try:
-        remove_favorite(anon_id, name, city)
-        return list_favorites(anon_id)
-    except Exception:
-        return gr.update()
+        pass
+    return _fav_view(anon_id)
 
 
 def on_feedback_click(history, anon_id, liked):
@@ -1062,7 +1099,6 @@ with gr.Blocks(
     anon_id_box = gr.Textbox(visible=False)  # localStorage anon-id (JS ile dolar)
     session_id_state = gr.State("")      # aktif session id; "" = henüz kaydedilmemiş yeni sohbet
     sessions_state = gr.State([])        # sidebar için session metadata listesi
-    favorites_state = gr.State([])       # sidebar favori mekan listesi
     sidebar_visible = gr.State(True)
     # UI dili: varsayılan + JS ile (localStorage/tarayıcı) doldurulan kutu
     lang_state = gr.State(DEFAULT_LANG)
@@ -1114,28 +1150,15 @@ with gr.Blocks(
                         api_name=False,
                     )
 
-            @gr.render(inputs=[favorites_state, lang_state])
-            def render_favorites(favs, lang):
-                if not favs:
-                    return
-                gr.HTML(f"<div class='fav-title'>{t(lang, 'favorites_title')}</div>")
-                for f in favs:
-                    name = f.get("name", "")
-                    city = f.get("city", "")
-                    done = bool(f.get("done"))
-                    check = "✅" if done else "⬜"
-                    label = f"{check} {name}" + (f" · {city}" if city else "")
-                    with gr.Row(elem_classes="fav-row" + (" done" if done else "")):
-                        done_btn = gr.Button(label, elem_classes="fav-select", scale=8)
-                        del_fav_btn = gr.Button("🗑", elem_classes="session-icon", scale=1, min_width=36)
-                    done_btn.click(
-                        lambda a, _n=name, _c=city: on_toggle_favorite(_n, _c, a),
-                        [anon_id_box], favorites_state, show_progress="hidden", api_name=False,
-                    )
-                    del_fav_btn.click(
-                        lambda a, _n=name, _c=city: on_remove_favorite(_n, _c, a),
-                        [anon_id_box], favorites_state, show_progress="hidden", api_name=False,
-                    )
+            # Favori mekanlar — statik HTML liste (her zaman güvenilir güncellenir) +
+            # yönet kontrolü (seç → ✓ yaptım / 🗑 sil).
+            fav_section = gr.HTML(value="", elem_classes="fav-section")
+            with gr.Row(visible=False, elem_classes="fav-manage-row") as fav_manage_row:
+                fav_manage_dd = gr.Dropdown(
+                    choices=[], value=None, show_label=False, container=False, scale=6,
+                )
+                fav_done_btn = gr.Button("✓", elem_classes="session-icon", scale=1, min_width=40)
+                fav_del_btn = gr.Button("🗑", elem_classes="session-icon", scale=1, min_width=40)
 
         with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
             weather_panel = gr.HTML(render_panel_skeleton())
@@ -1229,6 +1252,8 @@ with gr.Blocks(
     NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, time_ribbon, rain_alert, week_heatmap, travel_panel, weather_panel, theme_state]
     # Dil geçişinde güncellenecek tüm statik arayüz bileşenleri (apply_language sırası ile birebir).
     LANG_CHROME_OUTPUTS = [lang_state, lang_toggle_btn, topbar_html, greeting_html, sug1, sug2, sug3, sug4, new_chat_btn, pref_update_btn, show_loc_btn, feedback_q_html, fb_like, fb_dislike, send_btn, textbox, startup_status, dl_btn, fav_save_btn]
+    # Favori listesi görünümü: _fav_view() bu sırayla döndürür.
+    FAV_VIEW_OUTPUTS = [fav_section, fav_manage_row, fav_manage_dd]
 
     # Feedback satırı yalnızca gerçek bir aktivite önerisi yapıldığında görünür;
     # netleştirme sorusu / yalnızca-hava turlarında gizli kalır.
@@ -1268,7 +1293,10 @@ with gr.Blocks(
     # Takvime ekle: son öneriden .ics üret ve indir.
     dl_btn.click(make_calendar_file, chatbot, dl_btn, show_progress="hidden", api_name=False)
     # Favoriye kaydet: seçili mekanı favorilere ekle → sidebar listesini yenile.
-    fav_save_btn.click(on_save_favorite, [fav_dd, anon_id_box], favorites_state, show_progress="hidden", api_name=False)
+    fav_save_btn.click(on_save_favorite, [fav_dd, anon_id_box], FAV_VIEW_OUTPUTS, show_progress="hidden", api_name=False)
+    # Favori yönet: seçili favoriyi 'yaptım' işaretle / sil → listeyi yenile.
+    fav_done_btn.click(on_fav_toggle, [fav_manage_dd, anon_id_box], FAV_VIEW_OUTPUTS, show_progress="hidden", api_name=False)
+    fav_del_btn.click(on_fav_remove, [fav_manage_dd, anon_id_box], FAV_VIEW_OUTPUTS, show_progress="hidden", api_name=False)
     # Yeni sohbet: panelleri temizle + konumu kullanıcının konumuna döndür, ardından
     # tarayıcı geolocation'ı yeniden çek (gerçekten taşındıysa geo_coords.change tetiklenir).
     (new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
@@ -1316,7 +1344,7 @@ with gr.Blocks(
     # ile aynı kanıtlanmış desen) JS değeri set edince güvenilir tetiklenir.
     demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
     (anon_id_box.change(load_sessions_on_start, anon_id_box, sessions_state, show_progress="hidden", api_name=False)
-        .then(load_favorites_on_start, anon_id_box, favorites_state, show_progress="hidden", api_name=False)
+        .then(load_favorites_on_start, anon_id_box, FAV_VIEW_OUTPUTS, show_progress="hidden", api_name=False)
         .then(check_and_show_onboarding, [anon_id_box, lang_box], ONBOARDING_OUTPUTS, show_progress="hidden", api_name=False)
         .then(refresh_badge, anon_id_box, pers_badge, show_progress="hidden", api_name=False)
         .then(finish_startup, lang_box, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))

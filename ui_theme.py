@@ -784,6 +784,39 @@ def render_travel_compare(home_weather: dict, dest_weather: dict, lang: str = "t
     )
 
 
+def render_favorites_html(favs: list, lang: str = "tr") -> str:
+    """Kaydedilen favori mekanları sidebar için statik HTML listesine çevirir.
+
+    Her satır: ✅/📍 ad · şehir + 🗺 rota linki. 'done' işaretliler soluk/üstü çizili.
+    Favori yoksa "" döner (bölüm görünmez)."""
+    if not favs:
+        return ""
+    title = "⭐ My Saved Places" if lang == "en" else "⭐ Favori Mekanlarım"
+    items = []
+    for f in favs:
+        name = _html.escape(str(f.get("name", "")))
+        city = _html.escape(str(f.get("city", "")))
+        done = bool(f.get("done"))
+        mark = "✅" if done else "📍"
+        url = f.get("maps_url") or ""
+        route = (
+            f'<a class="fav-route" href="{_html.escape(url, quote=True)}" target="_blank" '
+            f'title="Rota" rel="noopener">🗺</a>'
+            if url else ""
+        )
+        sub = f'<span class="fav-city">{city}</span>' if city else ""
+        items.append(
+            f'<div class="fav-item{" done" if done else ""}">'
+            f'<span class="fav-name">{mark} {name}</span>{sub}{route}</div>'
+        )
+    return (
+        '<div class="fav-box">'
+        f'<div class="fav-title">{title}</div>'
+        f'{"".join(items)}'
+        "</div>"
+    )
+
+
 # ---- CSS -------------------------------------------------------------------
 
 CUSTOM_CSS = """
@@ -1745,7 +1778,7 @@ button.calendar-btn:hover, .calendar-btn button:hover {
     background: var(--surface-hover) !important;
 }
 
-/* ---- Favori mekanlar (sidebar + kaydet kontrolü) ---- */
+/* ---- Favori mekanlar (sidebar listesi + kaydet/yönet kontrolleri) ---- */
 .fav-title {
     font-size: 11.5px;
     font-weight: 700;
@@ -1753,27 +1786,29 @@ button.calendar-btn:hover, .calendar-btn button:hover {
     letter-spacing: .3px;
     margin: 12px 2px 6px;
 }
-.fav-row { gap: 4px !important; align-items: center !important; margin: 0 !important; border-radius: 10px; }
-button.fav-select, .fav-select button {
-    text-align: left !important;
-    justify-content: flex-start !important;
-    background: transparent !important;
-    border: none !important;
-    color: var(--ink) !important;
-    font-weight: 500 !important;
-    font-size: 12.5px !important;
-    border-radius: 10px !important;
-    padding: 7px 10px !important;
+.fav-box { margin-top: 4px; }
+.fav-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    color: var(--ink);
+}
+.fav-item:hover { background: var(--surface-strong); }
+.fav-name {
+    flex: 1 1 auto;
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-button.fav-select:hover, .fav-select button:hover { background: var(--surface-strong) !important; }
-.fav-row.done button.fav-select, .fav-row.done .fav-select button {
-    color: var(--ink-faint) !important;
-    text-decoration: line-through;
-    opacity: 0.78;
-}
+.fav-city { color: var(--ink-faint); font-size: 11px; flex: 0 0 auto; }
+.fav-route { flex: 0 0 auto; text-decoration: none; opacity: 0.85; }
+.fav-route:hover { opacity: 1; }
+.fav-item.done .fav-name { color: var(--ink-faint); text-decoration: line-through; opacity: 0.78; }
+.fav-manage-row { gap: 4px !important; align-items: center !important; margin: 2px 0 6px !important; }
 .fav-save-row { gap: 6px !important; align-items: center !important; margin-top: 8px !important; }
 button.fav-save-btn, .fav-save-btn button {
     background: var(--surface-strong) !important;
