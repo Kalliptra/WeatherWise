@@ -11,8 +11,9 @@ from typing import Literal, Optional
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
+from pydantic import BaseModel
 
-from core.llms import evaluator_llm, itinerary_llm, react_llm
+from core.llms import classifier_llm, evaluator_llm, itinerary_llm, react_llm
 from core.prompts import get_prompt
 from core.graph import _parse_supervisor
 from tools.forecast import (
@@ -219,10 +220,81 @@ _COMMON_STOPWORDS = frozenset([
 ])
 
 
+class _IntentResult(BaseModel):
+    """LLM niyet sınıflandırıcısının structured çıktısı."""
+
+    intent: Literal["weather_only", "activity", "follow_up", "other"]
+
+
+# Structured-output'a bağlı sınıflandırıcı (bir kez kurulur, function_calling şeması garanti eder)
+_intent_classifier = classifier_llm.with_structured_output(
+    _IntentResult, method="function_calling"
+)
+
+
+def _recent_context_snippet(messages: Optional[list[dict]], max_turns: int = 2) -> str:
+    """Güncel kullanıcı mesajından önceki son birkaç turu kısa bir bağlam metnine çevirir.
+
+    Follow-up referanslarını ("başka", "orada") çözmek için sınıflandırıcıya verilir.
+    """
+    if not messages:
+        return ""
+    prior = messages[:-1]  # son (güncel) kullanıcı mesajını dışla
+    lines: list[str] = []
+    for m in prior[-(max_turns * 2):]:
+        content = str(m.get("content", "")).strip()
+        if not content:
+            continue
+        label = "Asistan" if m.get("role") == "assistant" else "Kullanıcı"
+        lines.append(f"{label}: {content[:200]}")
+    return "\n".join(lines)
+
+
 def _classify_intent(
+    text: str,
+    lang: str,
+    has_history: bool,
+    messages: Optional[list[dict]] = None,
+) -> Literal["weather_only", "activity", "follow_up", "other"]:
+    """LLM tabanlı niyet sınıflandırıcı (GPT-4o mini, structured output).
+
+    Hata/timeout veya API anahtarı yoksa kural tabanlı yedeğe (`_classify_intent_rules`) düşer.
+    """
+    try:
+        snippet = _recent_context_snippet(messages)
+        if lang == "tr":
+            has_history_label = "evet" if has_history else "hayır"
+            human = (
+                (f"Önceki konuşma:\n{snippet}\n\n" if snippet else "")
+                + f"Önceki konuşma var mı: {has_history_label}\n"
+                + f"Sınıflandırılacak son kullanıcı mesajı:\n{text}"
+            )
+        else:
+            has_history_label = "yes" if has_history else "no"
+            human = (
+                (f"Prior conversation:\n{snippet}\n\n" if snippet else "")
+                + f"Prior conversation exists: {has_history_label}\n"
+                + f"Latest user message to classify:\n{text}"
+            )
+        result = _intent_classifier.invoke(
+            [
+                SystemMessage(content=get_prompt("intent_classifier", lang)),
+                HumanMessage(content=human),
+            ]
+        )
+        intent = result.intent
+        # Bağlam yoksa follow_up geçersiz → kural tabanlının davranışına benzer şekilde indirge
+        if intent == "follow_up" and not has_history:
+            intent = "other"
+        return intent
+    except Exception:
+        return _classify_intent_rules(text, lang, has_history)
+
+
+def _classify_intent_rules(
     text: str, lang: str, has_history: bool
 ) -> Literal["weather_only", "activity", "follow_up", "other"]:
-    """Kural tabanlı intent sınıflandırıcı — ek LLM çağrısı yoktur."""
+    """Kural tabanlı yedek sınıflandırıcı — LLM çağrısı başarısız olursa kullanılır."""
     lower = text.lower()
     tokens = set(lower.split())
     followup_kw = _FOLLOWUP_TR if lang == "tr" else _FOLLOWUP_EN
@@ -656,7 +728,7 @@ def chat_skywise(
 
     # Intent sınıflandırma (dil güncel olduktan sonra)
     has_history = any(m.get("role") == "assistant" for m in messages)
-    intent = _classify_intent(last_user, _current_language, has_history)
+    intent = _classify_intent(last_user, _current_language, has_history, messages)
 
     # Konum güncellemesi tespiti → sol paneldeki hava durumunu anında yenile.
     # get_weather() çağrısı _LAST_WEATHER'ı set eder; UI bunu okuyup paneli günceller.

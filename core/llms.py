@@ -23,6 +23,15 @@ evaluator_llm = ChatOpenAI(
     openai_api_key=_api_key,
 )
 
+# Niyet sınıflandırma (deterministik + hızlı; hata/timeout'ta kural tabanlı yedeğe düşülür)
+classifier_llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0.0,
+    max_retries=1,  # her mesajda çalışır → yavaş çağrıda hızlıca yedeğe düş
+    timeout=8,
+    openai_api_key=_api_key,
+)
+
 # Deterministik araç planlaması
 planner_llm = ChatOpenAI(
     model="gpt-4o-mini",

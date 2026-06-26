@@ -552,6 +552,47 @@ Rules:
 - English, concise, actionable."""
 
 
+_INTENT_CLASSIFIER_TR = """Sen bir niyet sınıflandırıcısısın. Kullanıcının SON mesajını
+aşağıdaki dört kategoriden TAM OLARAK BİRİNE ata.
+
+Kategoriler:
+- weather_only: Yalnızca hava durumu sorusu (sıcaklık, yağmur, nem, rüzgâr, kar, UV,
+  tahmin/derece). Aktivite veya mekân isteği YOK.
+- activity: Ne yapayım / nereye gideyim / öneri iste / mekân (müze, kafe, park, restoran,
+  plaj, sinema vb.), açık hava aktivitesi, ya da beğeni/tercihe göre öneri istekleri.
+- follow_up: Önceki asistan yanıtına atıfla devam eden kısa mesaj
+  ("başka var mı?", "peki orada?", "diğerleri?", "daha fazla"). YALNIZCA önceki konuşma varsa.
+- other: Selam/sohbet, yalnızca konum bildirimi ("Artık Ankara'dayım", "İzmir'e taşındım"),
+  ya da yukarıdaki üçüne uymayan her şey.
+
+Kurallar:
+- Tam olarak BİR etiket seç.
+- Önceki konuşma YOKSA asla follow_up kullanma.
+- follow-up referanslarını ("başka", "orada") çözmek için verilen son-mesaj bağlamını kullan.
+- Sadece konum/şehir bildiren, başka istek içermeyen mesaj → other.
+- "Açık havada ne yapsam" gibi eylem isteyen mesaj → activity (weather_only DEĞİL)."""
+
+_INTENT_CLASSIFIER_EN = """You are an intent classifier. Assign the user's LATEST message to
+EXACTLY ONE of the four categories below.
+
+Categories:
+- weather_only: A pure weather question (temperature, rain, humidity, wind, snow, UV,
+  forecast/degrees). NO request for activities or venues.
+- activity: Asking what to do / where to go / for recommendations / a venue (museum, cafe,
+  park, restaurant, beach, cinema, etc.), an outdoor activity, or preference-based suggestions.
+- follow_up: A short message continuing/referring to the previous assistant answer
+  ("any others?", "what about there?", "another one", "more"). ONLY if prior conversation exists.
+- other: Greetings/small talk, a bare location statement ("I moved to Ankara", "I'm in Izmir now"),
+  or anything that does not fit the three above.
+
+Rules:
+- Pick exactly ONE label.
+- If there is NO prior conversation, never use follow_up.
+- Use the provided recent-context to resolve follow-up references ("others", "there").
+- A message that only states a location/city with no other request → other.
+- A message asking for an action like "what can I do outdoors" → activity (NOT weather_only)."""
+
+
 # ---- Prompt registry ----
 
 PROMPTS: dict[str, dict[str, str]] = {
@@ -562,6 +603,7 @@ PROMPTS: dict[str, dict[str, str]] = {
         "chat": _CHAT_TR,
         "itinerary": _ITINERARY_TR,
         "itinerary_multiday": _ITINERARY_MULTIDAY_TR,
+        "intent_classifier": _INTENT_CLASSIFIER_TR,
     },
     "en": {
         "planner": _PLANNER_EN,
@@ -570,6 +612,7 @@ PROMPTS: dict[str, dict[str, str]] = {
         "chat": _CHAT_EN,
         "itinerary": _ITINERARY_EN,
         "itinerary_multiday": _ITINERARY_MULTIDAY_EN,
+        "intent_classifier": _INTENT_CLASSIFIER_EN,
     },
 }
 
