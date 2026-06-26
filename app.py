@@ -1204,9 +1204,13 @@ with gr.Blocks(
                 feedback_q_html = gr.HTML(_feedback_q_html(DEFAULT_LANG))
                 fb_like = gr.Button(t(DEFAULT_LANG, "fb_like"), elem_classes="fb-btn")
                 fb_dislike = gr.Button(t(DEFAULT_LANG, "fb_dislike"), elem_classes="fb-btn")
+                fb_close = gr.Button("✕", elem_classes="dismiss-btn", scale=0, min_width=0)
 
             # Öneri turundan sonra görünür olur; tıkta son öneriden .ics üretip indirir.
-            dl_btn = gr.DownloadButton(t(DEFAULT_LANG, "calendar_btn"), visible=False, elem_classes="calendar-btn")
+            # ✕ ile kullanıcı, değerlendirmeden bağımsız olarak takvim alanını kapatabilir.
+            with gr.Row(visible=False, elem_classes="calendar-row") as calendar_row:
+                dl_btn = gr.DownloadButton(t(DEFAULT_LANG, "calendar_btn"), elem_classes="calendar-btn")
+                cal_close = gr.Button("✕", elem_classes="dismiss-btn", scale=0, min_width=0)
 
             queued_display = gr.HTML(value="", elem_classes="queued-display-wrapper")
 
@@ -1269,7 +1273,7 @@ with gr.Blocks(
          .then(update_week_heatmap, None, week_heatmap, show_progress="hidden", api_name=False)
          .then(update_travel_panel, None, travel_panel, show_progress="hidden", api_name=False)
          .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
-         .then(reveal_calendar, None, dl_btn, show_progress="hidden", api_name=False)
+         .then(reveal_calendar, None, calendar_row, show_progress="hidden", api_name=False)
          .then(update_fav_controls, None, [fav_save_row, fav_dd], show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
     for sug in (sug1, sug2, sug3, sug4):
@@ -1281,7 +1285,7 @@ with gr.Blocks(
          .then(update_week_heatmap, None, week_heatmap, show_progress="hidden", api_name=False)
          .then(update_travel_panel, None, travel_panel, show_progress="hidden", api_name=False)
          .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
-         .then(reveal_calendar, None, dl_btn, show_progress="hidden", api_name=False)
+         .then(reveal_calendar, None, calendar_row, show_progress="hidden", api_name=False)
          .then(update_fav_controls, None, [fav_save_row, fav_dd], show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
 
@@ -1290,6 +1294,9 @@ with gr.Blocks(
     chatbot.like(on_feedback, [chatbot, anon_id_box], [pers_badge, feedback_row], api_name=False)
     fb_like.click(lambda h, a: on_feedback_click(h, a, True), [chatbot, anon_id_box], [pers_badge, feedback_row], show_progress="hidden", api_name=False)
     fb_dislike.click(lambda h, a: on_feedback_click(h, a, False), [chatbot, anon_id_box], [pers_badge, feedback_row], show_progress="hidden", api_name=False)
+    # ✕ ile alanları bağımsız kapat (değerlendirme / takvim); yeni öneride tekrar görünürler.
+    fb_close.click(lambda: gr.update(visible=False), None, feedback_row, show_progress="hidden", api_name=False)
+    cal_close.click(lambda: gr.update(visible=False), None, calendar_row, show_progress="hidden", api_name=False)
     # Takvime ekle: son öneriden .ics üret ve indir.
     dl_btn.click(make_calendar_file, chatbot, dl_btn, show_progress="hidden", api_name=False)
     # Favoriye kaydet: seçili mekanı favorilere ekle → sidebar listesini yenile.
@@ -1301,7 +1308,7 @@ with gr.Blocks(
     # tarayıcı geolocation'ı yeniden çek (gerçekten taşındıysa geo_coords.change tetiklenir).
     (new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
         .then(hide_feedback, None, feedback_row, show_progress="hidden", api_name=False)
-        .then(hide_feedback, None, dl_btn, show_progress="hidden", api_name=False)
+        .then(hide_feedback, None, calendar_row, show_progress="hidden", api_name=False)
         .then(hide_feedback, None, fav_save_row, show_progress="hidden", api_name=False)
         .then(None, None, geo_coords, js=GEO_JS, api_name=False))
     (show_loc_btn.click(show_map_on_demand, None, [map_panel, show_loc_btn], show_progress="hidden", api_name=False)
@@ -1357,7 +1364,7 @@ with gr.Blocks(
         api_name=False,
     )
         .then(hide_feedback, None, feedback_row, show_progress="hidden", api_name=False)
-        .then(hide_feedback, None, dl_btn, show_progress="hidden", api_name=False)
+        .then(hide_feedback, None, calendar_row, show_progress="hidden", api_name=False)
         .then(hide_feedback, None, fav_save_row, show_progress="hidden", api_name=False)
         .then(refresh_badge, anon_id_box, pers_badge, show_progress="hidden", api_name=False))
 

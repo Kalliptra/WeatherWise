@@ -1464,6 +1464,28 @@ button.fb-btn:hover, .fb-btn button:hover {
     color: var(--accent) !important;
     box-shadow: 0 4px 12px var(--glow);
 }
+/* Ayrı kapatma (✕) butonu — değerlendirme + takvim alanları */
+button.dismiss-btn, .dismiss-btn button {
+    background: transparent !important;
+    border: 1px solid var(--line) !important;
+    color: var(--ink-soft) !important;
+    border-radius: 999px !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    padding: 4px 9px !important;
+    min-width: 0 !important;
+    flex: 0 0 auto !important;
+}
+button.dismiss-btn:hover, .dismiss-btn button:hover {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    background: var(--surface-hover) !important;
+}
+.feedback-row .dismiss-btn { margin-left: auto; }  /* ✕'i satırın sağına it */
+.calendar-row {
+    align-items: center !important;
+    gap: 8px !important;
+}
 .session-row, .session-rename-row {
     gap: 4px !important;
     align-items: center !important;
