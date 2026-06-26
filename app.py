@@ -637,7 +637,7 @@ def check_and_show_onboarding(anon_id: str, lang: str = DEFAULT_LANG):
 def trigger_preference_reset(anon_id, lang: str = DEFAULT_LANG):
     """'Tercihlerimi Sıfırla' — kayıtlı aktivite tercihlerini siler, sohbeti
     temizler ve onboarding ekranını yeniden gösterir.
-    Dönüş: NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS (15 değer)
+    Dönüş: NEW_CHAT_OUTPUTS + ONBOARDING_OUTPUTS (21 değer)
     """
     _abort.set()
     if anon_id:
@@ -667,6 +667,7 @@ def trigger_preference_reset(anon_id, lang: str = DEFAULT_LANG):
         gr.update(value="", visible=False),    # travel_panel
         weather_panel,                         # weather_panel
         theme,                                 # theme_state
+        "",                                    # suggestion_box: eski öneriyi temizle
         gr.update(value=i18n.onboarding_html(lang)),  # greeting_html
         gr.update(value=cats[0]),              # sug1
         gr.update(value=cats[1]),              # sug2
