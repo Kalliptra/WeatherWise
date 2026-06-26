@@ -107,7 +107,7 @@ def build_ics(events: list[dict], base_date_iso: Optional[str] = None) -> str:
     lines: list[str] = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//SkyWise//Activity Planner//EN",
+        "PRODID:-//WeatherWise//Activity Planner//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
     ]
@@ -146,7 +146,7 @@ def build_ics(events: list[dict], base_date_iso: Optional[str] = None) -> str:
         ]
         if location:
             lines.append(f"LOCATION:{location}")
-        lines.append("DESCRIPTION:" + _escape("SkyWise — hava durumuna göre aktivite planı"))
+        lines.append("DESCRIPTION:" + _escape("WeatherWise — hava durumuna göre aktivite planı"))
         lines.append("END:VEVENT")
         count += 1
 

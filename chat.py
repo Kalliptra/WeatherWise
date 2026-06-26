@@ -1,4 +1,4 @@
-"""Sohbet tabanlı SkyWise katmanı — ReAct agent + supervisor gate."""
+"""Sohbet tabanlı WeatherWise katmanı — ReAct agent + supervisor gate."""
 
 from __future__ import annotations
 
@@ -630,7 +630,7 @@ def chat_skywise(
     anon_id: Optional[str] = None,
     force_language: Optional[str] = None,
 ) -> Iterator[str]:
-    """Sohbet tabanlı SkyWise asistanı.
+    """Sohbet tabanlı WeatherWise asistanı.
 
     Girdi: Gradio Chatbot(type="messages") formatı —
         [{"role": "user"|"assistant", "content": str}, ...]
@@ -781,13 +781,13 @@ def chat_skywise(
 
 
 _ONBOARDING_TR = (
-    "Merhaba! Ben SkyWise 🌤️\n\n"
+    "Merhaba! Ben WeatherWise 🌤️\n\n"
     "Bulunduğun şehrin hava durumunu analiz edip sana en uygun aktiviteleri öneririm.\n\n"
     "**Hangi tür aktiviteleri seversin?** Aşağıdan seçebilir ya da istediğini yazabilirsin."
 )
 
 _ONBOARDING_EN = (
-    "Hi! I'm SkyWise 🌤️\n\n"
+    "Hi! I'm WeatherWise 🌤️\n\n"
     "I analyze the weather in your city and suggest the best activities for you.\n\n"
     "**What kind of activities do you enjoy?** Pick one below or just type."
 )

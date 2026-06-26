@@ -20,7 +20,7 @@ class Evaluation(TypedDict):
     corrected: str
 
 
-class SkyWiseState(TypedDict, total=False):
+class WeatherWiseState(TypedDict, total=False):
     city: str
     preferences: str
     language: str

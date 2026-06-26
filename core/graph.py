@@ -10,7 +10,7 @@ from langgraph.graph import END, START, StateGraph
 
 from core.llms import evaluator_llm, itinerary_llm, planner_llm, react_llm
 from core.prompts import get_prompt
-from core.state import Evaluation, PlannedCall, PlannerOutput, SkyWiseState
+from core.state import Evaluation, PlannedCall, PlannerOutput, WeatherWiseState
 from tools.forecast import get_hourly_forecast, summarize_days, summarize_timing
 from tools.uv import get_uv_index
 from tools.venue import _USE_GOOGLE, find_venues, format_venues_for_llm, geocode_city
@@ -34,11 +34,11 @@ _structured_planner = planner_llm.with_structured_output(
 
 # ---- Yardımcı ----
 
-def _lang(state: SkyWiseState) -> str:
+def _lang(state: WeatherWiseState) -> str:
     return state.get("language", "tr")
 
 
-def _state_summary(state: SkyWiseState) -> str:
+def _state_summary(state: WeatherWiseState) -> str:
     parts = []
     if state.get("weather_summary"):
         parts.append("HAVA TOPLANDI:\n" + state["weather_summary"])
@@ -79,7 +79,7 @@ def _parse_supervisor(raw: str) -> Evaluation:
 
 # ---- Node'lar ----
 
-def plan_node(state: SkyWiseState) -> dict:
+def plan_node(state: WeatherWiseState) -> dict:
     iteration = state.get("iteration", 0) + 1
     history = state.get("history") or []
     last_feedback = history[-1] if history else ""
@@ -110,7 +110,7 @@ def plan_node(state: SkyWiseState) -> dict:
     return {"plan": calls, "plan_done": result.done, "iteration": iteration}
 
 
-def execute_node(state: SkyWiseState) -> dict:
+def execute_node(state: WeatherWiseState) -> dict:
     plan = state.get("plan") or []
     lang = _lang(state)
     out: dict = {}
@@ -220,7 +220,7 @@ def execute_node(state: SkyWiseState) -> dict:
     return out
 
 
-def recommend_node(state: SkyWiseState) -> dict:
+def recommend_node(state: WeatherWiseState) -> dict:
     iteration = state.get("iteration", 1)
     history = state.get("history") or []
     lang = _lang(state)
@@ -265,7 +265,7 @@ def recommend_node(state: SkyWiseState) -> dict:
     return {"recommendation": raw}
 
 
-def evaluate_node(state: SkyWiseState) -> dict:
+def evaluate_node(state: WeatherWiseState) -> dict:
     weather_summary = state.get("weather_summary", "")
     venues_text = "\n\n".join((state.get("venues") or {}).values())
     lang = _lang(state)
@@ -294,7 +294,7 @@ def evaluate_node(state: SkyWiseState) -> dict:
     return {"evaluation": evaluation, "history": [summary_line]}
 
 
-def refine_router(state: SkyWiseState) -> Literal["plan", "itinerary"]:
+def refine_router(state: WeatherWiseState) -> Literal["plan", "itinerary"]:
     e = state.get("evaluation") or {}
     i = state.get("iteration", 1)
     score = e.get("score")
@@ -307,7 +307,7 @@ def refine_router(state: SkyWiseState) -> Literal["plan", "itinerary"]:
     return "plan"
 
 
-def itinerary_node(state: SkyWiseState) -> dict:
+def itinerary_node(state: WeatherWiseState) -> dict:
     """Öneri metnini alıp günlük zaman planı üretir."""
     lang = _lang(state)
 
@@ -365,7 +365,7 @@ def itinerary_node(state: SkyWiseState) -> dict:
 
 # ---- Graph kurulumu ----
 
-_graph_builder = StateGraph(SkyWiseState)
+_graph_builder = StateGraph(WeatherWiseState)
 _graph_builder.add_node("plan", plan_node)
 _graph_builder.add_node("execute", execute_node)
 _graph_builder.add_node("recommend", recommend_node)

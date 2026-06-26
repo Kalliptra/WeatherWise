@@ -129,7 +129,7 @@ PLACES_TYPES: dict[str, str] = {
 
 
 def _user_agent() -> str:
-    return os.getenv("NOMINATIM_USER_AGENT", "SkyWise-SEN4018/1.0")
+    return os.getenv("NOMINATIM_USER_AGENT", "WeatherWise-SEN4018/1.0")
 
 
 def _normalize_category(category: str) -> list[tuple[str, str]]:

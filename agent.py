@@ -1,4 +1,4 @@
-"""Public API — SkyWise ajan çalıştırıcıları."""
+"""Public API — WeatherWise ajan çalıştırıcıları."""
 
 from __future__ import annotations
 

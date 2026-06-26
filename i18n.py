@@ -1,4 +1,4 @@
-"""SkyWise arayüz çevirileri (i18n).
+"""WeatherWise arayüz çevirileri (i18n).
 
 Statik UI metinlerinin tek doğruluk kaynağı. Sohbet cevabının dili buradan
 bağımsızdır (o, kullanıcının yazdığı dile göre `chat.py` tarafından belirlenir);
@@ -95,7 +95,7 @@ GREETING: dict[str, str] = {
     "tr": """
 <div class="greeting">
     <div class="wave">🌤️</div>
-    <h2>Merhaba! Ben SkyWise</h2>
+    <h2>Merhaba! Ben WeatherWise</h2>
     <p>Bulunduğun şehrin hava durumuna göre sana en uygun aktiviteleri öneririm.
     Aşağıdan kategori seç ya da istediğini yaz — hemen öneriler hazırlayayım.</p>
 </div>
@@ -103,7 +103,7 @@ GREETING: dict[str, str] = {
     "en": """
 <div class="greeting">
     <div class="wave">🌤️</div>
-    <h2>Hi! I'm SkyWise</h2>
+    <h2>Hi! I'm WeatherWise</h2>
     <p>Based on the weather in your city, I suggest the activities that suit you best.
     Pick a category below or just type what you want — I'll prepare suggestions right away.</p>
 </div>
@@ -114,7 +114,7 @@ ONBOARDING: dict[str, str] = {
     "tr": """
 <div class="greeting">
     <div class="wave">🌤️</div>
-    <h2>Merhaba! Ben SkyWise</h2>
+    <h2>Merhaba! Ben WeatherWise</h2>
     <div class="onboarding-question">
         <p><strong>Hangi tür aktiviteleri seversin?</strong></p>
         <p>Aşağıdan bir kategori seç — bulunduğun yerin havasına göre hemen öneriler hazırlayayım.</p>
@@ -124,7 +124,7 @@ ONBOARDING: dict[str, str] = {
     "en": """
 <div class="greeting">
     <div class="wave">🌤️</div>
-    <h2>Hi! I'm SkyWise</h2>
+    <h2>Hi! I'm WeatherWise</h2>
     <div class="onboarding-question">
         <p><strong>What kind of activities do you enjoy?</strong></p>
         <p>Pick a category below — I'll prepare suggestions based on your local weather right away.</p>

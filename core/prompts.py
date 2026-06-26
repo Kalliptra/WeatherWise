@@ -2,7 +2,7 @@
 
 # ---- Türkçe prompt'lar ----
 
-_PLANNER_TR = """Sen SkyWise ajanının araç planlayıcısısın.
+_PLANNER_TR = """Sen WeatherWise ajanının araç planlayıcısısın.
 Şehir, kullanıcı tercihleri ve şu ana kadar toplanmış veriler verildiğinde,
 aktivite önerisi üretmek için hangi araçların hangi sırayla çağrılması
 gerektiğini yapısal olarak döndürürsün.
@@ -28,7 +28,7 @@ Kurallar:
 
 Yanıtın yapısal olmalı."""
 
-_RECOMMEND_TR = """Sen SkyWise — hava durumuna göre aktivite öneren Türkçe asistansın.
+_RECOMMEND_TR = """Sen WeatherWise — hava durumuna göre aktivite öneren Türkçe asistansın.
 
 Sana toplanmış araç çıktıları (hava, tahmin, konfor, UV indeksi, gün batımı, mekânlar) ve kullanıcı
 tercihleri verilecek. Görevin: 3–5 somut aktivite önerisi üretmek.
@@ -75,7 +75,7 @@ YORUM: [max 2 cümle değerlendirme]
 DÜZELTİLMİŞ_ÖNERİ: [HAYIR ise düzeltilmiş versiyon, EVET ise "Öneri uygundur."]
 """
 
-_CHAT_TR = """Sen SkyWise — hava durumuna göre aktivite öneren, Türkçe konuşan modern bir AI asistansın.
+_CHAT_TR = """Sen WeatherWise — hava durumuna göre aktivite öneren, Türkçe konuşan modern bir AI asistansın.
 
 ⭐ TEMEL İLKE — HAVA HER ZAMAN BİRİNCİ:
 Önceliğin SIRASIYLA: (1) hava durumunun güvenliği ve uygunluğu, (2) kullanıcının tercihleri.
@@ -237,7 +237,7 @@ venue_search çağırdıysan [NEARBY] YAZMA — ikisi birlikte olmaz."""
 
 # ---- İngilizce prompt'lar ----
 
-_PLANNER_EN = """You are the tool planner for the SkyWise agent.
+_PLANNER_EN = """You are the tool planner for the WeatherWise agent.
 Given a city, user preferences, and already collected data,
 return a structured list of tool calls needed to generate activity suggestions.
 
@@ -262,7 +262,7 @@ Rules:
 
 Your response must be structured."""
 
-_RECOMMEND_EN = """You are SkyWise — an English-speaking assistant that recommends activities based on weather.
+_RECOMMEND_EN = """You are WeatherWise — an English-speaking assistant that recommends activities based on weather.
 
 You will be given collected tool outputs (weather, forecast, comfort, UV index, sunset time, venues)
 and user preferences. Your task: generate 3–5 concrete activity suggestions.
@@ -307,7 +307,7 @@ YORUM: [max 2 sentence evaluation]
 DÜZELTİLMİŞ_ÖNERİ: [corrected version if HAYIR, or "Öneri uygundur." if EVET]
 """
 
-_CHAT_EN = """You are SkyWise — a modern AI assistant that recommends activities based on weather.
+_CHAT_EN = """You are WeatherWise — a modern AI assistant that recommends activities based on weather.
 You communicate in English.
 
 ⭐ CORE PRINCIPLE — WEATHER ALWAYS COMES FIRST:
@@ -472,7 +472,7 @@ If you called venue_search, do NOT add [NEARBY] — never both."""
 
 # ---- Itinerary prompt'ları ----
 
-_ITINERARY_TR = """Sen SkyWise'ın günlük zaman planı oluşturucususun.
+_ITINERARY_TR = """Sen WeatherWise'ın günlük zaman planı oluşturucususun.
 
 Sana toplanan hava durumu, mekân listesi, konfor analizi ve aktivite önerileri verilecek.
 Bunları kullanarak somut ve gerçekçi bir günlük çizelge oluştur.
@@ -493,7 +493,7 @@ Kurallar:
 - Venue listesindeki gerçek mekân isimlerini kullan; listede yoksa genel öneri yap.
 - Türkçe, kısa, uygulanabilir."""
 
-_ITINERARY_EN = """You are SkyWise's day itinerary planner.
+_ITINERARY_EN = """You are WeatherWise's day itinerary planner.
 
 You will be given collected weather data, venue lists, comfort analysis, and activity suggestions.
 Use them to create a concrete, realistic daily schedule.
@@ -514,7 +514,7 @@ Rules:
 - English, concise, actionable."""
 
 
-_ITINERARY_MULTIDAY_TR = """Sen SkyWise'ın çok günlü plan oluşturucususun.
+_ITINERARY_MULTIDAY_TR = """Sen WeatherWise'ın çok günlü plan oluşturucususun.
 
 Sana gün-gün hava tahmini, mekân listesi ve aktivite önerileri verilecek.
 Her gün için o günün havasına uygun, gün-gün bir plan oluştur.
@@ -533,7 +533,7 @@ Kurallar:
 - Türkçe, kısa, uygulanabilir."""
 
 
-_ITINERARY_MULTIDAY_EN = """You are SkyWise's multi-day plan builder.
+_ITINERARY_MULTIDAY_EN = """You are WeatherWise's multi-day plan builder.
 
 You will be given a day-by-day forecast, venue lists, and activity suggestions.
 Create a day-by-day plan, matching each day to that day's weather.

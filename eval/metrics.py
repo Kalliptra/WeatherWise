@@ -218,7 +218,7 @@ def render_markdown_report(
 ) -> None:
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     lines: list[str] = []
-    lines.append(f"# SkyWise Evaluation Report — {date_str}")
+    lines.append(f"# WeatherWise Evaluation Report — {date_str}")
     lines.append("")
     lines.append(f"Model: {model}  |  Scenarios: {aggregate_stats.get('n', 0)}  |  Mocked weather: {'yes' if mocked else 'no'}")
     lines.append("")

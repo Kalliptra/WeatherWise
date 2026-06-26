@@ -1012,7 +1012,7 @@ def apply_geolocation(coords: str, anon_id: str = "", lang: str = DEFAULT_LANG):
 def _topbar_brand_html(lang: str) -> str:
     return (
         '<div class="topbar">'
-        '<div class="brand"><span class="brand-logo">◐</span> SkyWise</div>'
+        '<div class="brand"><span class="brand-logo">◐</span> WeatherWise</div>'
         f'<div class="brand-tag">{t(lang, "brand_tag")}</div>'
         "</div>"
     )
@@ -1074,7 +1074,7 @@ def toggle_language(current: str):
 
 
 with gr.Blocks(
-    title="SkyWise — Hava Durumu Aktivite Asistanı",
+    title="WeatherWise — Hava Durumu Aktivite Asistanı",
     theme=gr.themes.Base(
         primary_hue="indigo",
         neutral_hue="slate",

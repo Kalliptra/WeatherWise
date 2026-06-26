@@ -1,4 +1,4 @@
-"""SkyWise eval CLI.
+"""WeatherWise eval CLI.
 
 Usage:
   python -m eval.run_eval
@@ -109,7 +109,7 @@ def run_one(scenario: dict, judge_llm) -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="SkyWise eval runner")
+    parser = argparse.ArgumentParser(description="WeatherWise eval runner")
     parser.add_argument("--scenarios", default=str(REPO_ROOT / "eval" / "scenarios.json"))
     parser.add_argument("--ids", default="", help="virgülle ayrık alt küme, örn. S01,S07")
     parser.add_argument("--no-mock", action="store_true", help="gerçek OWM API'yi kullan")

@@ -1,4 +1,4 @@
-"""SkyWise UI teması: koyu (dark) glassmorphism tasarım + SVG ikonlar + panel HTML'i.
+"""WeatherWise UI teması: koyu (dark) glassmorphism tasarım + SVG ikonlar + panel HTML'i.
 
 Zemin her zaman koyu kalır; hava durumu yalnızca vurgu rengini (--accent),
 parlamayı (--glow) ve ikon tonlarını değiştirir. Tema, `document.body.dataset.theme`

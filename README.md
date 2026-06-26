@@ -1,5 +1,5 @@
 ---
-title: SkyWise
+title: WeatherWise
 emoji: 🌤
 colorFrom: indigo
 colorTo: blue
@@ -9,9 +9,9 @@ app_file: app.py
 pinned: false
 ---
 
-# ◐ SkyWise — Hava Durumuna Göre Aktivite Asistanı
+# ◐ WeatherWise — Hava Durumuna Göre Aktivite Asistanı
 
-SkyWise, bulunduğun (ya da gideceğin) şehrin **hava durumunu analiz edip** sana en uygun
+WeatherWise, bulunduğun (ya da gideceğin) şehrin **hava durumunu analiz edip** sana en uygun
 aktiviteleri öneren, Türkçe/İngilizce konuşan bir AI asistandır. Çekirdek ilkesi: **hava her
 zaman birinci** — bir aktivite havaya uymuyorsa, sevsen bile olduğu gibi önerilmez; güvenli
 bir alternatif sunulur. Tercihlerini (tarayıcına özel) hatırlayarak zamanla daha kişisel öneriler verir.
@@ -42,7 +42,7 @@ python app.py
 |---|---|---|
 | `OPENAI_API_KEY` | ✅ Zorunlu | Tüm LLM çağrıları (öneri, sınıflandırma, çıkarım) |
 | `OPENWEATHERMAP_API_KEY` | ✅ Zorunlu | Anlık hava durumu |
-| `NOMINATIM_USER_AGENT` | ⚠️ Önerilir | OSM geocoding için kimlik (ör. `SkyWise/1.0 (mail@ornek.com)`) |
+| `NOMINATIM_USER_AGENT` | ⚠️ Önerilir | OSM geocoding için kimlik (ör. `WeatherWise/1.0 (mail@ornek.com)`) |
 | `DEFAULT_CITY` | ⚪ Opsiyonel | Konum alınamazsa varsayılan şehir (varsayılan: Istanbul) |
 | `GOOGLE_PLACES_API_KEY` | ⚪ Opsiyonel | Puanlı/fotoğraflı mekan + Google harita. Yoksa **OpenStreetMap** (Overpass + Leaflet) devreye girer |
 | `UPSTASH_REDIS_REST_URL` | ⚪ Opsiyonel | Hafıza/oturum/favori kalıcılığı. Yoksa bellek-içi (oturum boyunca) çalışır |
@@ -194,7 +194,7 @@ core/
   graph.py        # plan → execute → recommend → evaluate döngüsü
   llms.py         # OpenAI istemcileri (react/evaluator/planner/itinerary)
   prompts.py      # Tüm sistem prompt'ları (TR/EN)
-  state.py        # SkyWiseState tipleri
+  state.py        # WeatherWiseState tipleri
 tools/
   weather.py      # OpenWeatherMap (anlık hava, konfor)
   forecast.py     # Open-Meteo (saatlik/günlük, zaman şeridi, hafta ısı haritası, yağmur nowcast)
