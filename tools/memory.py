@@ -302,6 +302,73 @@ def get_personalization_level(anon_id: Optional[str]) -> dict:
     return _level_from(int(memory.get("feedback_count", 0)), memory.get("preferences", {}))
 
 
+# ---- Favori mekanlar & aktivite günlüğü --------------------------------------
+# Kullanıcının açıkça kaydettiği mekanlar (öğrenilen tercihlerden ayrı; tercih
+# sıfırlama bunları SİLMEZ). "done" alanı mini günlük işaretidir (yaptım/yapacağım).
+
+MAX_FAVORITES = 30
+
+
+def _favorite_id(name: str, city: str) -> str:
+    return f"{(name or '').strip().lower()}|{(city or '').strip().lower()}"
+
+
+def list_favorites(anon_id: Optional[str]) -> list[dict]:
+    """Kaydedilen favori mekanları döner (en yeni en üstte). anon_id yoksa []."""
+    return load_memory(anon_id).get("favorites", []) if anon_id else []
+
+
+def add_favorite(anon_id: Optional[str], venue: dict) -> None:
+    """Bir mekanı favorilere ekler (ad+şehre göre tekilleştirir, en yeni en üstte).
+
+    venue: {name, city, category, lat, lon, maps_url}. anon_id yoksa no-op.
+    """
+    if not anon_id or not venue or not (venue.get("name") or "").strip():
+        return
+    memory = load_memory(anon_id)
+    favs = memory.setdefault("favorites", [])
+    fid = _favorite_id(venue.get("name", ""), venue.get("city", ""))
+    favs = [f for f in favs if _favorite_id(f.get("name", ""), f.get("city", "")) != fid]
+    favs.insert(0, {
+        "name": (venue.get("name") or "").strip(),
+        "city": (venue.get("city") or "").strip(),
+        "category": (venue.get("category") or "").strip(),
+        "lat": venue.get("lat"),
+        "lon": venue.get("lon"),
+        "maps_url": venue.get("maps_url") or "",
+        "date": date.today().isoformat(),
+        "done": False,
+    })
+    memory["favorites"] = favs[:MAX_FAVORITES]
+    save_memory(anon_id, memory)
+
+
+def remove_favorite(anon_id: Optional[str], name: str, city: str = "") -> None:
+    """Bir favoriyi ad+şehre göre kaldırır. anon_id yoksa no-op."""
+    if not anon_id:
+        return
+    memory = load_memory(anon_id)
+    fid = _favorite_id(name, city)
+    memory["favorites"] = [
+        f for f in memory.get("favorites", [])
+        if _favorite_id(f.get("name", ""), f.get("city", "")) != fid
+    ]
+    save_memory(anon_id, memory)
+
+
+def toggle_favorite_done(anon_id: Optional[str], name: str, city: str = "") -> None:
+    """Bir favorinin 'yaptım' (done) işaretini ters çevirir. anon_id yoksa no-op."""
+    if not anon_id:
+        return
+    memory = load_memory(anon_id)
+    fid = _favorite_id(name, city)
+    for f in memory.get("favorites", []):
+        if _favorite_id(f.get("name", ""), f.get("city", "")) == fid:
+            f["done"] = not f.get("done", False)
+            break
+    save_memory(anon_id, memory)
+
+
 def extract_and_update(
     messages: list[dict],
     city: Optional[str],

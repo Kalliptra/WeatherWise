@@ -36,18 +36,24 @@ from chat import (  # noqa: E402
     generate_location_suggestions,
     generate_session_title,
     get_current_language,
+    get_travel_destination,
     get_user_location,
     set_current_language,
     set_user_location,
+    week_planner_requested,
 )
 import i18n  # noqa: E402
 from i18n import t  # noqa: E402
 from tools.memory import (  # noqa: E402
+    add_favorite,
     apply_feedback,
     get_activity_preferences,
     get_personalization_level,
+    list_favorites,
     record_feedback,
+    remove_favorite,
     reset_preferences,
+    toggle_favorite_done,
     update_activity_preferences,
 )
 from ui_theme import (  # noqa: E402
@@ -57,8 +63,11 @@ from ui_theme import (  # noqa: E402
     render_panel_placeholder,
     render_panel_skeleton,
     render_personalization_badge,
+    render_rain_alert,
     render_time_ribbon,
+    render_travel_compare,
     render_weather_panel,
+    render_week_heatmap,
     weather_to_theme,
 )
 from tools.forecast import clear_last_forecast, get_last_forecast  # noqa: E402
@@ -151,7 +160,55 @@ async () => {
 }
 """
 
-THEME_JS = "(t) => { document.body.dataset.theme = t || 'clear-day'; }"
+# Temayı body'ye uygula + havaya duyarlı ambient partikül overlay'ini (#wx-fx) doldur.
+# Aynı tür için yeniden üretmez (data-kind); reduced-motion'da temizler.
+THEME_JS = """
+(t) => {
+    const theme = t || 'clear-day';
+    document.body.dataset.theme = theme;
+    const fx = document.getElementById('wx-fx');
+    if (!fx) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        fx.innerHTML = ''; fx.dataset.kind = 'none'; return;
+    }
+    let kind = 'none';
+    if (theme === 'rain' || theme === 'storm') kind = 'rain';
+    else if (theme === 'snow') kind = 'snow';
+    else if (theme === 'night') kind = 'stars';
+    if (fx.dataset.kind === kind) return;
+    fx.dataset.kind = kind;
+    fx.innerHTML = '';
+    fx.className = kind === 'none' ? '' : 'wx-fx-' + kind;
+    if (kind === 'none') return;
+    const n = kind === 'rain' ? 36 : 26;
+    for (let i = 0; i < n; i++) {
+        const el = document.createElement('span');
+        el.className = 'wx-fx-particle';
+        el.style.left = (Math.random() * 100).toFixed(2) + '%';
+        if (kind === 'rain') {
+            const dur = 0.5 + Math.random() * 0.55;
+            el.style.animationDuration = dur.toFixed(2) + 's';
+            el.style.animationDelay = (-Math.random() * dur).toFixed(2) + 's';
+            el.style.setProperty('--h', (14 + Math.random() * 12).toFixed(0) + 'px');
+        } else if (kind === 'snow') {
+            const dur = 6 + Math.random() * 6;
+            el.style.animationDuration = dur.toFixed(2) + 's';
+            el.style.animationDelay = (-Math.random() * dur).toFixed(2) + 's';
+            const s = (3 + Math.random() * 4).toFixed(1);
+            el.style.width = s + 'px'; el.style.height = s + 'px';
+            el.style.setProperty('--drift', (Math.random() * 40 - 20).toFixed(0) + 'px');
+        } else {
+            el.style.top = (Math.random() * 55).toFixed(2) + '%';
+            const dur = 2 + Math.random() * 3;
+            el.style.animationDuration = dur.toFixed(2) + 's';
+            el.style.animationDelay = (-Math.random() * dur).toFixed(2) + 's';
+            const s = (1.5 + Math.random() * 2).toFixed(1);
+            el.style.width = s + 'px'; el.style.height = s + 'px';
+        }
+        fx.appendChild(el);
+    }
+}
+"""
 
 # Yanıt beklenirken gösterilen "yazıyor..." göstergesi (dile duyarlı, i18n'den).
 typing_indicator = i18n.typing_indicator
@@ -414,7 +471,10 @@ def clear_chat():
         [],
         "",
         "",
-        gr.update(value="", visible=False),
+        gr.update(value="", visible=False),    # time_ribbon
+        gr.update(value="", visible=False),    # rain_alert
+        gr.update(value="", visible=False),    # week_heatmap
+        gr.update(value="", visible=False),    # travel_panel
         weather_panel,
         theme,
     )
@@ -599,6 +659,9 @@ def trigger_preference_reset(anon_id, lang: str = DEFAULT_LANG):
         "",                                    # queued_display
         "",                                    # session_id_state
         gr.update(value="", visible=False),    # time_ribbon
+        gr.update(value="", visible=False),    # rain_alert
+        gr.update(value="", visible=False),    # week_heatmap
+        gr.update(value="", visible=False),    # travel_panel
         weather_panel,                         # weather_panel
         theme,                                 # theme_state
         gr.update(value=i18n.onboarding_html(lang)),  # greeting_html
@@ -669,6 +732,57 @@ def update_time_ribbon():
     return gr.update(value=html, visible=True)
 
 
+def update_rain_alert():
+    """Bu turda çekilen saatlik tahminden yağmur nowcast uyarısını üretir (yoksa gizler)."""
+    try:
+        html = render_rain_alert(get_last_forecast(), lang=get_current_language())
+    except Exception:
+        html = None
+    if not html:
+        return gr.update(value="", visible=False)
+    return gr.update(value=html, visible=True)
+
+
+def update_week_heatmap():
+    """Çok günlü plan turunda (forecast_tool) gün × saat ısı haritasını üretir.
+    Yalnızca bu turda hafta planı istendiyse ve ≥2 günlük veri varsa gösterir."""
+    if not week_planner_requested():
+        return gr.update(value="", visible=False)
+    try:
+        html = render_week_heatmap(get_last_forecast(), lang=get_current_language())
+    except Exception:
+        html = None
+    if not html:
+        return gr.update(value="", visible=False)
+    return gr.update(value=html, visible=True)
+
+
+def update_travel_panel():
+    """Seyahat modunda (bu turda hedef şehir tespit edildiyse) konum vs hedef hava
+    karşılaştırmasını üretir. Hedef yoksa, konum yoksa veya şehirler aynıysa gizler."""
+    dest = get_travel_destination()
+    home_city = get_user_location()
+    if not dest or not home_city:
+        return gr.update(value="", visible=False)
+    dest_weather = get_last_weather()
+    try:
+        if not dest_weather or str(dest_weather.get("city", "")).lower() != dest.lower():
+            dest_weather = get_weather(dest)
+    except Exception:
+        dest_weather = None
+    try:
+        home_weather = get_weather(home_city)
+    except Exception:
+        home_weather = None
+    try:
+        html = render_travel_compare(home_weather, dest_weather, get_current_language())
+    except Exception:
+        html = None
+    if not html:
+        return gr.update(value="", visible=False)
+    return gr.update(value=html, visible=True)
+
+
 def _process_feedback(anon_id, content, liked, lang):
     """Geri bildirim ortak işlemi: sayaç + kategori çıkarımı (senkron) + toast.
 
@@ -701,6 +815,92 @@ def refresh_badge(anon_id):
     return render_personalization_badge(
         get_personalization_level(anon_id), get_current_language()
     )
+
+
+def make_calendar_file(history):
+    """'Takvime ekle' — son öneriden zamanlı etkinlik çıkarır, .ics üretir ve indirme
+    için dosya yolunu döner. Zamanlı etkinlik yoksa toast gösterir, dosyayı değiştirmez."""
+    import os
+    import tempfile
+    from datetime import date
+
+    from tools.calendar_ics import build_ics, extract_events
+
+    lang = get_current_language()
+    content = _last_assistant_content(history)
+    if not content:
+        return gr.update()
+    try:
+        events = extract_events(content, lang)
+        ics = build_ics(events, date.today().isoformat())
+    except Exception:
+        ics = ""
+    if not ics:
+        gr.Info(t(lang, "calendar_none"))
+        return gr.update()
+    path = os.path.join(tempfile.gettempdir(), "skywise_plan.ics")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(ics)
+    gr.Info(t(lang, "calendar_ready"))
+    return gr.update(value=path)
+
+
+# ---- Favori mekan handler'ları ----
+
+def load_favorites_on_start(anon_id):
+    try:
+        return list_favorites(anon_id)
+    except Exception:
+        return []
+
+
+def update_fav_controls(lang=DEFAULT_LANG):
+    """Bu turun mekanlarına göre 'favoriye kaydet' kontrolünü (dropdown + buton) günceller.
+    Mekan yoksa kontrolü gizler. Dönüş: (fav_save_row, fav_dd)."""
+    venues = get_last_venues()
+    names = [v.get("name") for v in (venues or []) if v.get("name")]
+    if not names:
+        return gr.update(visible=False), gr.update(choices=[], value=None)
+    return gr.update(visible=True), gr.update(choices=names, value=names[0])
+
+
+def on_save_favorite(selected_name, anon_id):
+    """Seçili mekanı (bu turun venue verisinden) favorilere ekler ve listeyi döndürür."""
+    if not anon_id or not selected_name:
+        return gr.update()
+    venue = next((v for v in (get_last_venues() or []) if v.get("name") == selected_name), None)
+    if not venue:
+        return gr.update()
+    city = (get_last_weather() or {}).get("city") or (get_user_location() or "")
+    try:
+        add_favorite(anon_id, {
+            "name": venue.get("name"),
+            "city": city,
+            "category": venue.get("type", ""),
+            "lat": venue.get("lat"),
+            "lon": venue.get("lon"),
+            "maps_url": venue.get("maps_url", ""),
+        })
+        gr.Info(t(get_current_language(), "fav_saved"))
+        return list_favorites(anon_id)
+    except Exception:
+        return gr.update()
+
+
+def on_toggle_favorite(name, city, anon_id):
+    try:
+        toggle_favorite_done(anon_id, name, city)
+        return list_favorites(anon_id)
+    except Exception:
+        return gr.update()
+
+
+def on_remove_favorite(name, city, anon_id):
+    try:
+        remove_favorite(anon_id, name, city)
+        return list_favorites(anon_id)
+    except Exception:
+        return gr.update()
 
 
 def on_feedback_click(history, anon_id, liked):
@@ -815,6 +1015,10 @@ def apply_language(lang: str):
         gr.update(value=t(lang, "send")),              # send_btn
         gr.update(placeholder=t(lang, "placeholder")), # textbox
         gr.update(value=_startup_status_html(lang)),   # startup_status
+        # DownloadButton: buton metni `label`tır; `value` dosya yoludur — value'yu
+        # ETİKETLE EZME (aksi halde tıkta o metni dosya sanıp 'File not allowed' verir).
+        gr.update(label=t(lang, "calendar_btn")),      # dl_btn
+        gr.update(value=t(lang, "fav_save_btn")),      # fav_save_btn
     )
 
 
@@ -843,6 +1047,8 @@ with gr.Blocks(
     js=FORCE_DARK_JS,
     fill_width=True,
 ) as demo:
+    # Havaya duyarlı ambient partikül overlay'i (position:fixed; THEME_JS doldurur).
+    gr.HTML('<div id="wx-fx" aria-hidden="true"></div>', elem_classes="wx-fx-host")
     with gr.Row(elem_classes="topbar-row"):
         toggle_sidebar_btn = gr.Button("◀", elem_classes="sidebar-toggle", scale=0)
         topbar_html = gr.HTML(_topbar_brand_html(DEFAULT_LANG))
@@ -856,6 +1062,7 @@ with gr.Blocks(
     anon_id_box = gr.Textbox(visible=False)  # localStorage anon-id (JS ile dolar)
     session_id_state = gr.State("")      # aktif session id; "" = henüz kaydedilmemiş yeni sohbet
     sessions_state = gr.State([])        # sidebar için session metadata listesi
+    favorites_state = gr.State([])       # sidebar favori mekan listesi
     sidebar_visible = gr.State(True)
     # UI dili: varsayılan + JS ile (localStorage/tarayıcı) doldurulan kutu
     lang_state = gr.State(DEFAULT_LANG)
@@ -907,11 +1114,45 @@ with gr.Blocks(
                         api_name=False,
                     )
 
+            @gr.render(inputs=[favorites_state, lang_state])
+            def render_favorites(favs, lang):
+                if not favs:
+                    return
+                gr.HTML(f"<div class='fav-title'>{t(lang, 'favorites_title')}</div>")
+                for f in favs:
+                    name = f.get("name", "")
+                    city = f.get("city", "")
+                    done = bool(f.get("done"))
+                    check = "✅" if done else "⬜"
+                    label = f"{check} {name}" + (f" · {city}" if city else "")
+                    with gr.Row(elem_classes="fav-row" + (" done" if done else "")):
+                        done_btn = gr.Button(label, elem_classes="fav-select", scale=8)
+                        del_fav_btn = gr.Button("🗑", elem_classes="session-icon", scale=1, min_width=36)
+                    done_btn.click(
+                        lambda a, _n=name, _c=city: on_toggle_favorite(_n, _c, a),
+                        [anon_id_box], favorites_state, show_progress="hidden", api_name=False,
+                    )
+                    del_fav_btn.click(
+                        lambda a, _n=name, _c=city: on_remove_favorite(_n, _c, a),
+                        [anon_id_box], favorites_state, show_progress="hidden", api_name=False,
+                    )
+
         with gr.Column(scale=2, min_width=260, elem_classes="panel-col"):
             weather_panel = gr.HTML(render_panel_skeleton())
+            rain_alert = gr.HTML(value="", visible=False, elem_classes="rain-alert-wrap")
             time_ribbon = gr.HTML(value="", visible=False, elem_classes="time-ribbon-wrap")
+            week_heatmap = gr.HTML(value="", visible=False, elem_classes="week-heatmap-wrap")
+            travel_panel = gr.HTML(value="", visible=False, elem_classes="travel-panel-wrap")
             map_panel = gr.HTML(value="", visible=False)
             show_loc_btn = gr.Button(t(DEFAULT_LANG, "show_map_btn"), visible=False, elem_classes="loc-btn")
+            with gr.Row(visible=False, elem_classes="fav-save-row") as fav_save_row:
+                fav_dd = gr.Dropdown(
+                    choices=[], value=None, show_label=False, container=False,
+                    scale=8, elem_classes="fav-dd",
+                )
+                fav_save_btn = gr.Button(
+                    t(DEFAULT_LANG, "fav_save_btn"), elem_classes="fav-save-btn", scale=3, min_width=88
+                )
 
         with gr.Column(scale=5, elem_classes="chat-surface"):
             with gr.Column(visible=True, elem_classes="empty-state") as empty_state:
@@ -940,6 +1181,9 @@ with gr.Blocks(
                 feedback_q_html = gr.HTML(_feedback_q_html(DEFAULT_LANG))
                 fb_like = gr.Button(t(DEFAULT_LANG, "fb_like"), elem_classes="fb-btn")
                 fb_dislike = gr.Button(t(DEFAULT_LANG, "fb_dislike"), elem_classes="fb-btn")
+
+            # Öneri turundan sonra görünür olur; tıkta son öneriden .ics üretip indirir.
+            dl_btn = gr.DownloadButton(t(DEFAULT_LANG, "calendar_btn"), visible=False, elem_classes="calendar-btn")
 
             queued_display = gr.HTML(value="", elem_classes="queued-display-wrapper")
 
@@ -982,27 +1226,38 @@ with gr.Blocks(
     RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display, session_id_state, sessions_state]
     RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, anon_id_box, lang_state]
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
-    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, time_ribbon, weather_panel, theme_state]
+    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, time_ribbon, rain_alert, week_heatmap, travel_panel, weather_panel, theme_state]
     # Dil geçişinde güncellenecek tüm statik arayüz bileşenleri (apply_language sırası ile birebir).
-    LANG_CHROME_OUTPUTS = [lang_state, lang_toggle_btn, topbar_html, greeting_html, sug1, sug2, sug3, sug4, new_chat_btn, pref_update_btn, show_loc_btn, feedback_q_html, fb_like, fb_dislike, send_btn, textbox, startup_status]
+    LANG_CHROME_OUTPUTS = [lang_state, lang_toggle_btn, topbar_html, greeting_html, sug1, sug2, sug3, sug4, new_chat_btn, pref_update_btn, show_loc_btn, feedback_q_html, fb_like, fb_dislike, send_btn, textbox, startup_status, dl_btn, fav_save_btn]
 
     # Feedback satırı yalnızca gerçek bir aktivite önerisi yapıldığında görünür;
     # netleştirme sorusu / yalnızca-hava turlarında gizli kalır.
     reveal_feedback = lambda: gr.update(visible=did_last_turn_recommend())
+    reveal_calendar = lambda: gr.update(visible=did_last_turn_recommend())
     hide_feedback = lambda: gr.update(visible=False)
     for trigger in (textbox.submit, send_btn.click):
         (trigger(pre_submit, [textbox, queued_state, lang_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
          .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
          .then(update_time_ribbon, None, time_ribbon, show_progress="hidden", api_name=False)
+         .then(update_rain_alert, None, rain_alert, show_progress="hidden", api_name=False)
+         .then(update_week_heatmap, None, week_heatmap, show_progress="hidden", api_name=False)
+         .then(update_travel_panel, None, travel_panel, show_progress="hidden", api_name=False)
          .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
+         .then(reveal_calendar, None, dl_btn, show_progress="hidden", api_name=False)
+         .then(update_fav_controls, None, [fav_save_row, fav_dd], show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
     for sug in (sug1, sug2, sug3, sug4):
         (sug.click(pre_submit, [sug, queued_state, lang_state], PRE_OUTPUTS, show_progress="hidden", api_name=False)
          .then(set_busy, None, send_btn, show_progress="hidden", api_name=False)
          .then(respond_from_history, RESPOND_INPUTS, RESPOND_OUTPUTS, concurrency_limit=1, show_progress="hidden", api_name=False)
          .then(update_time_ribbon, None, time_ribbon, show_progress="hidden", api_name=False)
+         .then(update_rain_alert, None, rain_alert, show_progress="hidden", api_name=False)
+         .then(update_week_heatmap, None, week_heatmap, show_progress="hidden", api_name=False)
+         .then(update_travel_panel, None, travel_panel, show_progress="hidden", api_name=False)
          .then(reveal_feedback, None, feedback_row, show_progress="hidden", api_name=False)
+         .then(reveal_calendar, None, dl_btn, show_progress="hidden", api_name=False)
+         .then(update_fav_controls, None, [fav_save_row, fav_dd], show_progress="hidden", api_name=False)
          .then(set_idle, None, send_btn, show_progress="hidden", api_name=False))
 
     # Native chatbot (hover) 👍/👎 ve açık feedback butonları aynı işlemi paylaşır;
@@ -1010,12 +1265,19 @@ with gr.Blocks(
     chatbot.like(on_feedback, [chatbot, anon_id_box], [pers_badge, feedback_row], api_name=False)
     fb_like.click(lambda h, a: on_feedback_click(h, a, True), [chatbot, anon_id_box], [pers_badge, feedback_row], show_progress="hidden", api_name=False)
     fb_dislike.click(lambda h, a: on_feedback_click(h, a, False), [chatbot, anon_id_box], [pers_badge, feedback_row], show_progress="hidden", api_name=False)
+    # Takvime ekle: son öneriden .ics üret ve indir.
+    dl_btn.click(make_calendar_file, chatbot, dl_btn, show_progress="hidden", api_name=False)
+    # Favoriye kaydet: seçili mekanı favorilere ekle → sidebar listesini yenile.
+    fav_save_btn.click(on_save_favorite, [fav_dd, anon_id_box], favorites_state, show_progress="hidden", api_name=False)
     # Yeni sohbet: panelleri temizle + konumu kullanıcının konumuna döndür, ardından
     # tarayıcı geolocation'ı yeniden çek (gerçekten taşındıysa geo_coords.change tetiklenir).
     (new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
         .then(hide_feedback, None, feedback_row, show_progress="hidden", api_name=False)
+        .then(hide_feedback, None, dl_btn, show_progress="hidden", api_name=False)
+        .then(hide_feedback, None, fav_save_row, show_progress="hidden", api_name=False)
         .then(None, None, geo_coords, js=GEO_JS, api_name=False))
-    show_loc_btn.click(show_map_on_demand, None, [map_panel, show_loc_btn], show_progress="hidden", api_name=False)
+    (show_loc_btn.click(show_map_on_demand, None, [map_panel, show_loc_btn], show_progress="hidden", api_name=False)
+        .then(update_fav_controls, None, [fav_save_row, fav_dd], show_progress="hidden", api_name=False))
 
     toggle_sidebar_btn.click(
         # Açıkken "◀" (kapat), kapalıyken "☰" (aç) ikonu göster.
@@ -1054,6 +1316,7 @@ with gr.Blocks(
     # ile aynı kanıtlanmış desen) JS değeri set edince güvenilir tetiklenir.
     demo.load(None, None, anon_id_box, js=ANON_ID_JS, api_name=False)
     (anon_id_box.change(load_sessions_on_start, anon_id_box, sessions_state, show_progress="hidden", api_name=False)
+        .then(load_favorites_on_start, anon_id_box, favorites_state, show_progress="hidden", api_name=False)
         .then(check_and_show_onboarding, [anon_id_box, lang_box], ONBOARDING_OUTPUTS, show_progress="hidden", api_name=False)
         .then(refresh_badge, anon_id_box, pers_badge, show_progress="hidden", api_name=False)
         .then(finish_startup, lang_box, STARTUP_ENABLE_OUTPUTS, show_progress="hidden", api_name=False))
@@ -1066,6 +1329,8 @@ with gr.Blocks(
         api_name=False,
     )
         .then(hide_feedback, None, feedback_row, show_progress="hidden", api_name=False)
+        .then(hide_feedback, None, dl_btn, show_progress="hidden", api_name=False)
+        .then(hide_feedback, None, fav_save_row, show_progress="hidden", api_name=False)
         .then(refresh_badge, anon_id_box, pers_badge, show_progress="hidden", api_name=False))
 
 

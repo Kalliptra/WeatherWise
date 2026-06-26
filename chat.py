@@ -47,6 +47,12 @@ _user_location: Optional[str] = None  # Kullanıcının bildirdiği güncel konu
 # yalnızca-hava ya da konum bildirimi turlarında False; UI feedback satırını
 # (👍/👎) yalnızca True olduğunda gösterir.
 _last_turn_recommended: bool = False
+# Son turun çok günlü plan (forecast_tool) içerip içermediği — sol paneldeki hafta
+# ısı haritası yalnızca True olduğunda gösterilir.
+_week_planner_requested: bool = False
+# Kullanıcının yakında gideceği hedef şehir ("Roma'ya gidiyorum"). Mevcut konumu
+# DEĞİŞTİRMEZ; öneriler ve karşılaştırma paneli hedef şehre göre kurulur.
+_travel_destination: Optional[str] = None
 # Genel/soyut aktivite önerisinde, kullanıcı isterse yakında arama yapması için
 # bekleyen (kategori, şehir). [NEARBY:kategori] işaretinden doldurulur.
 _pending_nearby: tuple[Optional[str], Optional[str]] = (None, None)
@@ -78,6 +84,28 @@ _LOC_UPDATE_PATTERNS = (
     re.compile(r"\bmy location is\s+([A-Z][\w]+)", re.IGNORECASE),
 )
 
+# Gelecek-seyahat kalıpları ("Roma'ya gidiyorum", "going to Rome"). Konumu DEĞİŞTİRMEZ;
+# yalnızca hedef şehri işaretler. Geçmiş varış kalıpları (_LOC_UPDATE) ile çakışmaz:
+# burada gelecek/niyet zamanları (gidiyorum/gideceğim/going/traveling) hedeflenir.
+_TRAVEL_PATTERNS = (
+    # TR: "Roma'ya gidiyorum/gideceğim/gitmek istiyorum/uçuyorum/seyahat ediyorum".
+    # Ek: ünsüzle bitende "'e/'a", ünlüyle bitende tampon "y" ile "'ye/'ya".
+    re.compile(
+        r"\b([A-ZÇĞİÖŞÜ][\wçğıöşü]+)['’]?y?[ae]\s+"
+        r"(?:gidiyorum|gideceğim|gidecegim|gitmek|gideyim|uçuyorum|ucuyorum|"
+        r"seyahat|yola çıkıyorum|yola cikiyorum)\b",
+        re.UNICODE,
+    ),
+    # TR: "Roma gezisi / Roma tatili planlıyorum"
+    re.compile(r"\b([A-ZÇĞİÖŞÜ][\wçğıöşü]+)\s+(?:gezisi|tatili|seyahati)\b", re.UNICODE),
+    # EN: "going to Rome", "traveling to Rome", "trip to Rome", "flying to Rome", "visiting Rome"
+    re.compile(
+        r"\b(?:going to|travel(?:ing|ling)? to|trip to|fly(?:ing)? to|heading to|visiting)\s+"
+        r"([A-Z][\w]+)",
+        re.IGNORECASE,
+    ),
+)
+
 
 def get_last_locations() -> list[str]:
     return list(_last_locations)
@@ -86,6 +114,23 @@ def get_last_locations() -> list[str]:
 def did_last_turn_recommend() -> bool:
     """Son chat_skywise turunun gerçek bir aktivite önerisi üretip üretmediğini döner."""
     return _last_turn_recommended
+
+
+def week_planner_requested() -> bool:
+    """Son turun çok günlü plan (forecast_tool) içerip içermediğini döner — sol
+    paneldeki hafta ısı haritasının görünürlüğünü belirler."""
+    return _week_planner_requested
+
+
+def get_travel_destination() -> Optional[str]:
+    """Bu turda tespit edilen gelecek-seyahat hedef şehri (yoksa None) — seyahat
+    karşılaştırma panelinin görünürlüğünü belirler."""
+    return _travel_destination
+
+
+def clear_travel_destination() -> None:
+    global _travel_destination
+    _travel_destination = None
 
 
 def clear_last_location() -> None:
@@ -212,6 +257,17 @@ def _extract_city_from_message(text: str) -> Optional[str]:
 def _detect_location_update(text: str) -> Optional[str]:
     """Mesaj bir konum bildirimi içeriyorsa yeni şehri döner, yoksa None."""
     for pattern in _LOC_UPDATE_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            city = m.group(1).strip()
+            if city and city.lower() not in _COMMON_STOPWORDS:
+                return city
+    return None
+
+
+def _detect_travel(text: str) -> Optional[str]:
+    """Mesaj gelecek bir seyahat niyeti içeriyorsa hedef şehri döner, yoksa None."""
+    for pattern in _TRAVEL_PATTERNS:
         m = pattern.search(text)
         if m:
             city = m.group(1).strip()
@@ -391,9 +447,28 @@ def _gradio_to_lc_messages(
         else:
             location_block = f"\n\n## Detected Location\nUser's current location: {_user_location}"
 
+    # Seyahat niyeti varsa hedef şehri vurgula — öneriler hedefe ve gidiş günündeki havaya göre.
+    travel_block = ""
+    if _travel_destination:
+        if _current_language == "tr":
+            travel_block = (
+                f"\n\n## Seyahat\nKullanıcı yakında **{_travel_destination}** şehrine gidecek. "
+                f"Mevcut konum yerine HEDEF şehri ({_travel_destination}) kullan: current_weather ile "
+                f"güncel havasını ve forecast ile gün-gün tahminini al; önerileri {_travel_destination} "
+                f"için ve gidiş günündeki havaya göre kur."
+            )
+        else:
+            travel_block = (
+                f"\n\n## Travel\nThe user is about to travel to **{_travel_destination}**. "
+                f"Use the DESTINATION city ({_travel_destination}) instead of the current location: "
+                f"fetch its current_weather and day-by-day forecast; base suggestions on "
+                f"{_travel_destination} and that day's weather."
+            )
+
     system_content = (
         base_prompt
         + location_block
+        + travel_block
         + ("\n\n" + memory_block if memory_block else "")
     )
     lc: list = [SystemMessage(content=system_content)]
@@ -564,16 +639,22 @@ def chat_skywise(
     force_language verilirse (ör. kart tıklaması = UI dili) cevap dili o dile
     sabitlenir; aksi halde kullanıcının yazdığı mesajdan otomatik tespit edilir.
     """
-    # Bu turun öneri durumu sıfırlanır; yalnızca gerçek öneri üretildiğinde True olur.
-    global _last_turn_recommended
+    # Bu turun öneri/hafta-planı/seyahat durumu sıfırlanır; yalnızca ilgili koşulda set edilir.
+    global _last_turn_recommended, _week_planner_requested, _travel_destination
     _last_turn_recommended = False
+    _week_planner_requested = False
+    _travel_destination = None
+
+    # Seyahat niyeti (hedef şehir) — sistem promptu kurulmadan ÖNCE tespit edilir ki
+    # _gradio_to_lc_messages seyahat bloğunu prompta ekleyebilsin.
+    last_user = _last_user_text(messages)
+    _travel_destination = _detect_travel(last_user)
 
     # Dil tespiti + LangChain mesajlarına dönüşüm (bu _current_language'ı günceller)
     lc_messages = _gradio_to_lc_messages(messages, anon_id=anon_id, force_language=force_language)
     n_original = len(lc_messages)
 
     # Intent sınıflandırma (dil güncel olduktan sonra)
-    last_user = _last_user_text(messages)
     has_history = any(m.get("role") == "assistant" for m in messages)
     intent = _classify_intent(last_user, _current_language, has_history)
 
@@ -679,13 +760,20 @@ def chat_skywise(
             except (ValueError, ConnectionError):
                 pass
 
-    # Tahmin grafiği güvencesi: panelde gösterilen şehir için saatlik tahmini
-    # (cache'li, ücretsiz Open-Meteo) çek → UI grafiği get_last_forecast'tan okur.
+    # Tahmin güvencesi: panelde gösterilen şehir için saatlik tahmini (cache'li, ücretsiz
+    # Open-Meteo) çek → UI zaman şeridi/ısı haritası get_last_forecast'tan okur. Bu turda
+    # gün-gün tahmin aracı (forecast_tool) çalıştıysa 7 günlük veriyi koru ki hafta ısı
+    # haritası tüm haftayı görebilsin (aksi halde 3 gün yeterli).
+    multiday = any(
+        isinstance(m, ToolMessage) and getattr(m, "name", "") == "forecast_tool"
+        for m in new_messages
+    )
+    _week_planner_requested = multiday
     panel_weather = get_last_weather()
     chart_city = (panel_weather or {}).get("city") or _focus_city_from_tools(new_messages) or _user_location
     if chart_city:
         try:
-            get_hourly_forecast(chart_city, days=3, lang=_current_language)
+            get_hourly_forecast(chart_city, days=7 if multiday else 3, lang=_current_language)
         except Exception:
             pass
 

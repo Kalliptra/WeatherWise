@@ -266,28 +266,124 @@ def summarize_timing(forecast: dict, lang: str = "tr") -> str:
     return " ".join(parts)
 
 
+def _hour_state(h: dict) -> str:
+    """Tek bir saatin açık-hava uygunluk durumunu döndürür.
+
+    state ∈ {"rain", "cold", "hot", "uv", "good"} — yağmur + sıcaklık + UV birlikte
+    değerlendirilir; "good" açık hava için ideal saati işaret eder. classify_today_hours
+    ve classify_week_hours ortak kullanır (kural tek yerde)."""
+    if h["is_rainy"]:
+        return "rain"
+    if h["temp"] <= 0:
+        return "cold"
+    if h["temp"] >= 38:
+        return "hot"
+    if h["uv"] >= 6:
+        return "uv"
+    return "good"
+
+
 def classify_today_hours(forecast: dict) -> list[dict]:
     """Bugünün kalan saatlerini görsel şerit için durum etiketiyle döndürür.
 
     Her saat için {"hour": int, "temp": float, "uv": float, "state": str} döner.
-    state ∈ {"rain", "cold", "hot", "uv", "good"} — yağmur + UV + sıcaklık birlikte
-    değerlendirilir; "good" açık hava için ideal saati işaret eder.
     """
     hours = forecast.get("hours") or []
     out: list[dict] = []
     for h in _today_upcoming(hours):
-        if h["is_rainy"]:
-            state = "rain"
-        elif h["temp"] <= 0:
-            state = "cold"
-        elif h["temp"] >= 38:
-            state = "hot"
-        elif h["uv"] >= 6:
-            state = "uv"
-        else:
-            state = "good"
-        out.append({"hour": h["hour"], "temp": h["temp"], "uv": h["uv"], "state": state})
+        out.append({"hour": h["hour"], "temp": h["temp"], "uv": h["uv"], "state": _hour_state(h)})
     return out
+
+
+# Hafta ısı haritasında gösterilecek gündüz penceresi (gece saatlerini ele).
+_WEEK_HOUR_START, _WEEK_HOUR_END = 6, 22
+
+
+def classify_week_hours(
+    forecast: dict, hour_start: int = _WEEK_HOUR_START, hour_end: int = _WEEK_HOUR_END
+) -> list[dict]:
+    """Tüm günlerin gündüz saatlerini durum etiketiyle gün gün gruplar (ısı haritası için).
+
+    classify_today_hours ile AYNI durum kuralları (_hour_state), ama bütün günleri kapsar
+    ve her günü ayrı satır olarak döndürür:
+    [{"date": "2024-06-26", "hours": [{"hour": int, "state": str}, ...]}, ...]
+    """
+    hours = forecast.get("hours") or []
+    by_date: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for h in hours:
+        hr = h.get("hour", 0)
+        if hr < hour_start or hr > hour_end:
+            continue
+        d = h["date"]
+        if d not in by_date:
+            by_date[d] = []
+            order.append(d)
+        by_date[d].append({"hour": hr, "state": _hour_state(h)})
+    return [{"date": d, "hours": by_date[d]} for d in order]
+
+
+def best_week_window(forecast: dict) -> Optional[dict]:
+    """Hafta boyunca en uzun ardışık 'ideal' (good) açık-hava penceresini bulur.
+
+    Döner: {"date": str, "start": int, "end": int} (end = son ideal saatin +1'i) ya da
+    hiç ideal saat yoksa None.
+    """
+    week = classify_week_hours(forecast)
+    best: Optional[tuple[int, str, int, int]] = None  # (uzunluk, date, başlangıç, son saat)
+    for day in week:
+        run_start: Optional[int] = None
+        prev: Optional[int] = None
+        for cell in day["hours"]:
+            if cell["state"] == "good":
+                if run_start is None:
+                    run_start = cell["hour"]
+                prev = cell["hour"]
+            elif run_start is not None:
+                length = prev - run_start + 1
+                if best is None or length > best[0]:
+                    best = (length, day["date"], run_start, prev)
+                run_start = None
+        if run_start is not None and prev is not None:
+            length = prev - run_start + 1
+            if best is None or length > best[0]:
+                best = (length, day["date"], run_start, prev)
+    if not best:
+        return None
+    _, date_iso, start, end_hour = best
+    return {"date": date_iso, "start": start, "end": end_hour + 1}
+
+
+def rain_nowcast(forecast: dict, lang: str = "tr") -> Optional[str]:
+    """Önümüzdeki ~2 saat için kısa, deterministik yağış uyarısı (LLM'siz).
+
+    - Şu an kuru ama 2 saat içinde yağış başlıyorsa → başlangıç saatini bildirir.
+    - Şu an yağışlı ama 2 saat içinde diniyorsa → diniş saatini bildirir.
+    Kayda değer bir durum yoksa None döner (UI'da uyarı gösterilmez).
+    """
+    hours = forecast.get("hours") or []
+    upcoming = _today_upcoming(hours)
+    if len(upcoming) < 2:
+        return None
+
+    window = upcoming[:3]  # bu saat + sonraki 2 saat
+    if not window[0]["is_rainy"]:
+        for h in window[1:]:
+            if h["is_rainy"]:
+                hh = h["hour"]
+                if lang == "en":
+                    return f"☔ Rain starts around {hh:02d}:00 — grab an umbrella."
+                return f"☔ Saat {hh:02d}:00'de yağmur başlıyor — şemsiyeni al."
+        return None
+
+    # Şu an yağışlı: 2 saat içinde diniyor mu?
+    for h in window[1:]:
+        if not h["is_rainy"]:
+            hh = h["hour"]
+            if lang == "en":
+                return f"🌤️ Rain easing around {hh:02d}:00."
+            return f"🌤️ Yağmur {hh:02d}:00 civarı diniyor."
+    return None
 
 
 def summarize_days(forecast: dict, lang: str = "tr") -> str:

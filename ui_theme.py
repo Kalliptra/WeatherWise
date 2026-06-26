@@ -653,6 +653,137 @@ def render_time_ribbon(forecast: dict, lang: str = "tr"):
     )
 
 
+def render_rain_alert(forecast: dict, lang: str = "tr"):
+    """Yağmur nowcast uyarısı — `tools.forecast.rain_nowcast()` metnini küçük bir
+    'pill' kutusuna sarar. Kayda değer durum yoksa None döner (uyarı gizli kalır)."""
+    if not forecast:
+        return None
+    from tools.forecast import rain_nowcast
+
+    msg = rain_nowcast(forecast, lang)
+    if not msg:
+        return None
+    # Yağmur başlıyorsa "warn" (accent), diniyorsa "calm" tonunu kullan
+    tone = "calm" if msg.startswith("🌤") else "warn"
+    return f'<div class="rain-alert rain-alert--{tone}">{msg}</div>'
+
+
+def render_week_heatmap(forecast: dict, lang: str = "tr"):
+    """Çok günlü tahminden gün × saat 'ideal pencere' ısı haritası üretir.
+
+    `tools.forecast.classify_week_hours()` çıktısını gün satırlarına, `best_week_window()`
+    ile en iyi açık-hava penceresini özet satırına çevirir. Hücre renkleri zaman şeridiyle
+    aynı `.tr-cell--{state}` sınıflarını yeniden kullanır. Tek gün/veri yoksa None döner."""
+    if not forecast:
+        return None
+    from tools.forecast import best_week_window, classify_week_hours, _weekday_label
+
+    week = classify_week_hours(forecast)
+    if len(week) < 2:
+        return None  # tek günde zaman şeridi yeterli; ısı haritası gösterme
+
+    best = best_week_window(forecast)
+    if best:
+        wd = _weekday_label(best["date"], lang)
+        a, b = best["start"], best["end"]
+        b_str = "24:00" if b >= 24 else f"{b:02d}:00"
+        summary = (
+            f"🟢 Best window: {wd} {a:02d}:00–{b_str}"
+            if lang == "en"
+            else f"🟢 En iyi pencere: {wd} {a:02d}:00–{b_str}"
+        )
+    else:
+        summary = (
+            "No ideal outdoor window this week"
+            if lang == "en"
+            else "Bu hafta açık hava için ideal pencere görünmüyor"
+        )
+
+    # Saat eksenini veriden türet (gün gün aynı gündüz penceresi).
+    axis = sorted({c["hour"] for day in week for c in day["hours"]})
+    if not axis:
+        return None
+
+    head_cells = "".join(
+        f'<span class="wh-hh">{h:02d}</span>' if h % 4 == 0 else '<span class="wh-hh"></span>'
+        for h in axis
+    )
+
+    rows_html = []
+    for day in week:
+        wd = _weekday_label(day["date"], lang)
+        state_by_hour = {c["hour"]: c["state"] for c in day["hours"]}
+        cells = "".join(
+            f'<span class="tr-cell tr-cell--{state_by_hour.get(h, "none")}" title="{wd} {h:02d}:00"></span>'
+            for h in axis
+        )
+        rows_html.append(
+            f'<div class="wh-row"><span class="wh-day">{wd}</span>'
+            f'<div class="wh-track">{cells}</div></div>'
+        )
+
+    rain_word = "rain" if lang == "en" else "yağış"
+    legend = (
+        '<div class="tr-legend">'
+        '<span class="tr-dot tr-cell--good"></span>ideal'
+        '<span class="tr-dot tr-cell--uv"></span>UV'
+        f'<span class="tr-dot tr-cell--rain"></span>{rain_word}'
+        "</div>"
+    )
+
+    return (
+        '<div class="week-heatmap">'
+        f'<div class="wh-summary">{summary}</div>'
+        '<div class="wh-grid">'
+        f'<div class="wh-row wh-head"><span class="wh-day"></span><div class="wh-track">{head_cells}</div></div>'
+        + "".join(rows_html)
+        + "</div>"
+        f"{legend}"
+        "</div>"
+    )
+
+
+def render_travel_compare(home_weather: dict, dest_weather: dict, lang: str = "tr"):
+    """Seyahat modunda 'konum vs hedef' kompakt hava karşılaştırma kartı.
+
+    İki şehir de geçerli ve farklı değilse None döner (kart gizli kalır)."""
+    if not home_weather or not dest_weather:
+        return None
+    hc = str(home_weather.get("city", "")).strip()
+    dc = str(dest_weather.get("city", "")).strip()
+    if not hc or not dc or hc.lower() == dc.lower():
+        return None
+
+    ht = round(home_weather.get("temperature", 0))
+    dt = round(dest_weather.get("temperature", 0))
+    hcond = str(home_weather.get("condition", "")).strip()
+    hcond = hcond[:1].upper() + hcond[1:] if hcond else ""
+    dcond = str(dest_weather.get("condition", "")).strip()
+    dcond = dcond[:1].upper() + dcond[1:] if dcond else ""
+    delta = dt - ht
+    sign = "+" if delta > 0 else ""
+
+    if lang == "en":
+        title = "Trip weather"
+        word = "warmer" if delta > 0 else "cooler" if delta < 0 else "the same"
+        diff = f"{dc} is {sign}{delta}° {word} than {hc}" if delta else f"{dc} ≈ {hc}"
+    else:
+        title = "Seyahat havası"
+        word = "sıcak" if delta > 0 else "soğuk" if delta < 0 else "aynı"
+        diff = f"{dc}, {hc}'den {sign}{delta}° {word}" if delta else f"{dc} ≈ {hc}"
+
+    return (
+        '<div class="travel-compare">'
+        f'<div class="tc-title">✈️ {title}</div>'
+        f'<div class="tc-row"><span class="tc-place">🏠 {hc}</span>'
+        f'<span class="tc-temp">{ht}°{(" · " + hcond) if hcond else ""}</span></div>'
+        f'<div class="tc-row tc-dest"><span class="tc-place">📍 {dc}</span>'
+        f'<span class="tc-temp">{dt}°{(" · " + dcond) if dcond else ""}</span></div>'
+        f'<div class="tc-diff">{diff}</div>'
+        "</div>"
+    )
+
+
 # ---- CSS -------------------------------------------------------------------
 
 CUSTOM_CSS = """
@@ -1536,6 +1667,162 @@ button.suggestion-btn:hover {
 }
 .tr-legend .tr-dot:first-child { margin-left: 0; }
 
+/* ---- Yağmur nowcast uyarısı ---- */
+.rain-alert-wrap { padding: 0; }
+.rain-alert {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    border-radius: 14px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    background: var(--surface-strong);
+    color: var(--ink);
+}
+.rain-alert--warn {
+    border-color: rgba(96, 165, 250, 0.5);
+    background: rgba(96, 165, 250, 0.14);
+    box-shadow: 0 6px 18px rgba(96, 165, 250, 0.18);
+}
+.rain-alert--calm {
+    border-color: rgba(74, 222, 128, 0.4);
+    background: rgba(74, 222, 128, 0.12);
+}
+
+/* ---- Akıllı hafta planlayıcı ısı haritası ---- */
+.week-heatmap {
+    margin-top: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 12px 14px;
+}
+.wh-summary {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 10px;
+}
+.wh-grid { display: flex; flex-direction: column; gap: 3px; }
+.wh-row { display: flex; align-items: center; gap: 8px; }
+.wh-day {
+    flex: 0 0 32px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    text-align: right;
+}
+.wh-track { display: flex; gap: 2px; flex: 1 1 auto; }
+.wh-track .tr-cell { height: 16px; border-radius: 3px; }
+.wh-head { margin-bottom: 1px; }
+.wh-head .wh-track { gap: 2px; }
+.wh-hh {
+    flex: 1 1 0;
+    font-size: 9px;
+    color: var(--ink-faint);
+    text-align: center;
+    white-space: nowrap;
+}
+.tr-cell--none { background: rgba(255, 255, 255, 0.06); }
+.week-heatmap .tr-legend { margin-top: 9px; }
+
+/* ---- Takvime ekle butonu ---- */
+button.calendar-btn, .calendar-btn button {
+    background: var(--surface-strong) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--ink-soft) !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    margin-top: 4px !important;
+}
+button.calendar-btn:hover, .calendar-btn button:hover {
+    border-color: var(--accent) !important;
+    color: var(--ink) !important;
+    background: var(--surface-hover) !important;
+}
+
+/* ---- Favori mekanlar (sidebar + kaydet kontrolü) ---- */
+.fav-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    letter-spacing: .3px;
+    margin: 12px 2px 6px;
+}
+.fav-row { gap: 4px !important; align-items: center !important; margin: 0 !important; border-radius: 10px; }
+button.fav-select, .fav-select button {
+    text-align: left !important;
+    justify-content: flex-start !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--ink) !important;
+    font-weight: 500 !important;
+    font-size: 12.5px !important;
+    border-radius: 10px !important;
+    padding: 7px 10px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+button.fav-select:hover, .fav-select button:hover { background: var(--surface-strong) !important; }
+.fav-row.done button.fav-select, .fav-row.done .fav-select button {
+    color: var(--ink-faint) !important;
+    text-decoration: line-through;
+    opacity: 0.78;
+}
+.fav-save-row { gap: 6px !important; align-items: center !important; margin-top: 8px !important; }
+button.fav-save-btn, .fav-save-btn button {
+    background: var(--surface-strong) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--ink-soft) !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+}
+button.fav-save-btn:hover, .fav-save-btn button:hover {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    background: var(--surface-hover) !important;
+}
+
+/* ---- Seyahat karşılaştırma kartı ---- */
+.travel-compare {
+    margin-top: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid var(--accent);
+    border-radius: 16px;
+    padding: 11px 14px;
+}
+.tc-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+}
+.tc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    padding: 3px 0;
+}
+.tc-place { color: var(--ink-soft); font-weight: 600; }
+.tc-temp { color: var(--ink); font-weight: 700; }
+.tc-dest .tc-place, .tc-dest .tc-temp { color: var(--accent); }
+.tc-diff {
+    margin-top: 7px;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    text-align: right;
+}
+
 /* ---- Venue kartları ---- */
 .map-panel { margin-top: 14px; }
 .venue-strip {
@@ -1736,6 +2023,70 @@ button.suggestion-btn:hover {
 .suggestion-btn[disabled] {
     opacity: 0.5 !important;
     cursor: not-allowed !important;
+}
+
+/* ---- Havaya duyarlı ambient arka plan animasyonu ---- */
+/* Host bloğu yer kaplamasın; #wx-fx position:fixed ile viewport'u kaplar. */
+.wx-fx-host {
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+}
+#wx-fx {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 2;
+}
+.wx-fx-particle { position: absolute; top: -24px; will-change: transform, opacity; }
+
+/* Yağmur (storm dahil) — ince, ekran karışımıyla hafif parıltılı çizgiler */
+.wx-fx-rain { mix-blend-mode: screen; opacity: 0.5; }
+.wx-fx-rain .wx-fx-particle {
+    width: 1.5px;
+    height: var(--h, 18px);
+    background: linear-gradient(to bottom, rgba(180, 210, 255, 0), rgba(180, 210, 255, 0.75));
+    animation: wx-rain linear infinite;
+}
+@keyframes wx-rain {
+    0% { transform: translateY(-12vh); }
+    100% { transform: translateY(112vh); }
+}
+
+/* Kar — yumuşak, hafif yana savrulan taneler */
+.wx-fx-snow { opacity: 0.72; }
+.wx-fx-snow .wx-fx-particle {
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+    animation: wx-snow linear infinite;
+}
+@keyframes wx-snow {
+    0% { transform: translate(0, -8vh); opacity: 0; }
+    12% { opacity: 1; }
+    88% { opacity: 1; }
+    100% { transform: translate(var(--drift, 0), 110vh); opacity: 0.4; }
+}
+
+/* Gece — üst bölgede sönüp parlayan yıldızlar */
+.wx-fx-stars { opacity: 0.9; }
+.wx-fx-stars .wx-fx-particle {
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+    animation: wx-twinkle ease-in-out infinite;
+}
+@keyframes wx-twinkle {
+    0%, 100% { opacity: 0.15; transform: scale(0.7); }
+    50% { opacity: 0.95; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #wx-fx { display: none !important; }
 }
 
 /* ---- Mobil ---- */
