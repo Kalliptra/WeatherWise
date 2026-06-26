@@ -452,10 +452,11 @@ def respond_from_history(history, queued, session_id, sessions, anon_id, lang=DE
         yield history, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), remaining, qd, session_id, new_sessions
 
 
-def clear_chat():
+def clear_chat(lang=DEFAULT_LANG):
     """'Yeni Sohbet' — sohbeti ve panelleri temizler, aktif session id'yi sıfırlar.
     Hava panelini kullanıcının algılanan konumuna döndürür (önceki sohbette başka bir
-    şehre bakılmış olabilir)."""
+    şehre bakılmış olabilir). Tab önerisini de sıfırlar: gizli suggestion kutusu boşalır
+    ve input placeholder'ı önceki turun `↹` ipucundan varsayılana döner."""
     _abort.set()
     clear_last_venues()
     clear_last_location()
@@ -465,7 +466,7 @@ def clear_chat():
     return (
         gr.update(value=[], visible=False),
         gr.update(visible=True),
-        "",
+        gr.update(value="", placeholder=t(lang, "placeholder")),  # textbox: değer + placeholder sıfırla
         gr.update(value="", visible=False),
         gr.update(visible=False),
         "",
@@ -478,6 +479,7 @@ def clear_chat():
         gr.update(value="", visible=False),    # travel_panel
         weather_panel,
         theme,
+        "",                                    # suggestion_box: eski öneriyi temizle
     )
 
 
@@ -1253,7 +1255,7 @@ with gr.Blocks(
     RESPOND_OUTPUTS = [chatbot, textbox, empty_state, weather_panel, theme_state, map_panel, show_loc_btn, location_state, suggestion_box, queued_state, queued_display, session_id_state, sessions_state]
     RESPOND_INPUTS = [chatbot, queued_state, session_id_state, sessions_state, anon_id_box, lang_state]
     PRE_OUTPUTS = [textbox, queued_state, queued_display]
-    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, time_ribbon, rain_alert, week_heatmap, travel_panel, weather_panel, theme_state]
+    NEW_CHAT_OUTPUTS = [chatbot, empty_state, textbox, map_panel, show_loc_btn, location_state, queued_state, queued_display, session_id_state, time_ribbon, rain_alert, week_heatmap, travel_panel, weather_panel, theme_state, suggestion_box]
     # Dil geçişinde güncellenecek tüm statik arayüz bileşenleri (apply_language sırası ile birebir).
     LANG_CHROME_OUTPUTS = [lang_state, lang_toggle_btn, topbar_html, greeting_html, sug1, sug2, sug3, sug4, new_chat_btn, pref_update_btn, show_loc_btn, feedback_q_html, fb_like, fb_dislike, send_btn, textbox, startup_status, dl_btn, fav_save_btn]
     # Favori listesi görünümü: _fav_view() bu sırayla döndürür.
@@ -1306,7 +1308,7 @@ with gr.Blocks(
     fav_del_btn.click(on_fav_remove, [fav_manage_dd, anon_id_box], FAV_VIEW_OUTPUTS, show_progress="hidden", api_name=False)
     # Yeni sohbet: panelleri temizle + konumu kullanıcının konumuna döndür, ardından
     # tarayıcı geolocation'ı yeniden çek (gerçekten taşındıysa geo_coords.change tetiklenir).
-    (new_chat_btn.click(clear_chat, None, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
+    (new_chat_btn.click(clear_chat, lang_state, NEW_CHAT_OUTPUTS, show_progress="hidden", api_name=False)
         .then(hide_feedback, None, feedback_row, show_progress="hidden", api_name=False)
         .then(hide_feedback, None, calendar_row, show_progress="hidden", api_name=False)
         .then(hide_feedback, None, fav_save_row, show_progress="hidden", api_name=False)

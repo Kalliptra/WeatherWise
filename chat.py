@@ -880,48 +880,55 @@ def generate_next_suggestion(history: list[dict]) -> tuple[str, str]:
         if not last_ai:
             return "", ""
 
-        # Kullanıcının son mesajını da bağlam için ekle
-        last_user = next(
-            (m for m in reversed(clean) if m.get("role") == "user"),
-            None,
-        )
-
-        ai_text = (last_ai.get("content") or "")[:800]
-        user_text = (last_user.get("content") or "")[:200] if last_user else ""
-
-        context = f"Kullanıcı: {user_text}\nAsistan: {ai_text}" if user_text else f"Asistan: {ai_text}"
+        # Son birkaç turu bağlam olarak ver (yalnız tek mesaj değil): son asistan yanıtı
+        # birincil çapadır (≈800 karakter), önceki mesajlar daha kısa tutulur.
+        label_user = "Kullanıcı" if lang == "tr" else "User"
+        label_ai = "Asistan" if lang == "tr" else "Assistant"
+        ctx_lines = []
+        for m in clean[-6:]:
+            content = (m.get("content") or "").strip()
+            if not content:
+                continue
+            limit = 800 if m is last_ai else 220
+            label = label_ai if m.get("role") == "assistant" else label_user
+            ctx_lines.append(f"{label}: {content[:limit]}")
+        context = "\n".join(ctx_lines)
 
         if lang == "tr":
             sys_msg = (
-                "Aşağıda bir hava durumu aktivite asistanının verdiği yanıt var. "
-                "Bu yanıtı okuyan bir kullanıcının DOĞAL OLARAK SORACAĞI TAM OLARAK BİR sonraki prompt öner. "
-                "Öneri, asistanın yanıtında geçen spesifik detaylara (şehir, sıcaklık, etkinlik, mekan, saat vb.) doğrudan atıf yapmalı. "
-                "MUTLAKA bir ETKİNLİK veya AKTİVİTE içermeli (koşu, bisiklet, piknik, yürüyüş, kafe, müze, yüzme, tenis vb.). "
+                "Aşağıda bir hava durumu aktivite asistanı ile kullanıcının son konuşması var. "
+                "Bu konuşmanın AKIŞINI sürdüren, kullanıcının DOĞAL OLARAK SORACAĞI TAM OLARAK BİR sonraki prompt öner. "
+                "Öneri, asistanın SON yanıtındaki somut detaylara (şehir, sıcaklık, mekan, saat, tahmin günü, UV, rüzgâr, nem vb.) doğrudan atıf yapmalı. "
+                "En doğal ve isabetli soru neyse onu yaz: aktivite (koşu, bisiklet, yürüyüş vb.) uygunsa serbest ama ZORUNLU DEĞİL — "
+                "kıyafet, zamanlama, mekan seçimi, karşılaştırma, uygunluk gibi konular da geçerli. "
+                "Konuşma neyle ilgiliyse öneri de onunla ilgili olsun; konuyu zorla değiştirme. "
                 "Kaliteli örnekler:\n"
-                "- Asistan 'Kadıköy'de 28°C, güneşli' dediyse → 'Kadıköy sahilinde sabah yüzüşü için erken mi gitsem?'\n"
-                "- Asistan 'Perşembe yağmur bekleniyor' dediyse → 'Yağmur günü için yakınımda kapalı spor salonu öner'\n"
-                "- Asistan 'UV indeksi 8' dediyse → 'UV yüksekken sabah 7-9 arası koşu güvenli mi?'\n"
-                "- Asistan 'Rüzgar 30 km/h' dediyse → 'Bu rüzgarla açık denizde kano yapmak tehlikeli mi?'\n"
-                "Kullanıcı bakış açısından yaz (birinci tekil şahıs). Sadece öneriyi yaz. Maksimum 90 karakter. Türkçe."
+                "- Asistan 'Kadıköy'de 28°C, güneşli' dediyse → 'Bu sıcakta öğleden sonra sahilde yürüyüş bunaltır mı?'\n"
+                "- Asistan 'Akşam yağmur bekleniyor' dediyse → 'Şemsiyesiz akşam 6'da çıksam ıslanır mıyım?'\n"
+                "- Asistan 'Yarın 15°C, rüzgarlı' dediyse → 'Bu havada ne giysem üşümem?'\n"
+                "- Asistan iki şehri karşılaştırdıysa → 'Hafta sonu için hangisi daha kuru geçecek?'\n"
+                "Kullanıcı bakış açısından yaz (birinci tekil şahıs). Sadece öneriyi yaz, tırnak/numara yok. Maksimum 90 karakter. Türkçe."
             )
         else:
             sys_msg = (
-                "Below is a response from a weather-based activity assistant. "
-                "Generate EXACTLY ONE natural follow-up prompt that a user would type after reading this response. "
-                "The prompt MUST directly reference specific details from the assistant's reply "
-                "(city, temperature, activity mentioned, venue, time of day, forecast day, UV level, wind, etc.). "
-                "It MUST include a specific ACTIVITY or EVENT (running, cycling, picnic, hiking, swimming, tennis, etc.). "
+                "Below is the recent conversation between a user and a weather-based activity assistant. "
+                "Generate EXACTLY ONE natural follow-up prompt that continues this conversation — the next thing the user would actually type. "
+                "The prompt MUST directly reference specific details from the assistant's LAST reply "
+                "(city, temperature, venue, time of day, forecast day, UV level, wind, humidity, etc.). "
+                "Write whatever is the most natural and on-point question: an activity (running, cycling, hiking, etc.) is welcome "
+                "but NOT required — clothing, timing, venue choice, comparison, suitability are all valid too. "
+                "Stay on the topic the conversation is about; do not force a topic change. "
                 "Quality examples:\n"
-                "- If assistant said 'Paris, 26°C sunny' → 'Is the Seine riverside nice for an evening jog today?'\n"
-                "- If assistant said 'rain expected Thursday' → 'Any good indoor climbing gyms near the city centre?'\n"
-                "- If assistant said 'UV index 9' → 'Best time for a morning hike to avoid the high UV?'\n"
-                "- If assistant said 'wind 35 km/h' → 'Too windy for paddleboarding or should I try kitesurfing?'\n"
-                "Write from user's perspective (first person). Output only the prompt. Maximum 90 characters. English."
+                "- If assistant said 'Kadıköy, 28°C sunny' → 'Would an afternoon walk by the shore feel too hot in this?'\n"
+                "- If assistant said 'rain expected this evening' → 'Will I get soaked if I head out at 6 without an umbrella?'\n"
+                "- If assistant said 'tomorrow 15°C, windy' → 'What should I wear so I don't get cold in this?'\n"
+                "- If assistant compared two cities → 'Which one stays drier over the weekend?'\n"
+                "Write from the user's perspective (first person). Output only the prompt, no quotes or numbering. Maximum 90 characters. English."
             )
 
-        response = react_llm.invoke(
+        # temperature'ı düşür (global 0.7 yerine 0.3) → daha odaklı/isabetli öneri.
+        response = react_llm.bind(temperature=0.3, max_tokens=120).invoke(
             [SystemMessage(content=sys_msg), HumanMessage(content=context)],
-            config={"max_tokens": 120},
         )
         suggestion = (response.content or "").strip().strip('"').strip("'")
         if not suggestion:
