@@ -48,6 +48,10 @@ _user_location: Optional[str] = None  # Kullanıcının bildirdiği güncel konu
 # yalnızca-hava ya da konum bildirimi turlarında False; UI feedback satırını
 # (👍/👎) yalnızca True olduğunda gösterir.
 _last_turn_recommended: bool = False
+# Öneri akışının sürüp sürmediği — turlar arası kalıcıdır. Bir follow-up ("başka var mı?")
+# aracı yeniden çağırmadan önceki bağlamdan öneri sunduğunda da feedback/takvim alanları
+# (kullanıcı kapatmış olsa bile) yeniden görünsün diye kullanılır.
+_recommendation_context_active: bool = False
 # Son turun çok günlü plan (forecast_tool) içerip içermediği — sol paneldeki hafta
 # ısı haritası yalnızca True olduğunda gösterilir.
 _week_planner_requested: bool = False
@@ -569,6 +573,17 @@ def _turn_produced_recommendation(new_messages: list) -> bool:
     return False
 
 
+# Mekan önerisi içeren yanıtların imzası: mesafe (~Xkm), puan (⭐) veya rota linki.
+# format_venues_for_llm bunları üretir, LLM yanıtında korur. Follow-up turları aracı
+# yeniden çağırmadan önceki bağlamdan öneri sunduğunda bu işaretlerle yakalanır.
+_RECO_REPLY_RE = re.compile(r"~\s*\d+(?:[.,]\d+)?\s*km|\[(?:Rota|Route)\]|⭐")
+
+
+def _reply_offers_recommendations(text: str) -> bool:
+    """Asistan yanıtı somut mekan önerileri içeriyor mu (araç çağrısından bağımsız)."""
+    return bool(text) and bool(_RECO_REPLY_RE.search(text))
+
+
 _CITY_TOOLS = frozenset(
     {"venue_search_tool", "current_weather_tool", "forecast_tool",
      "hourly_timing_tool", "uv_tool"}
@@ -713,6 +728,7 @@ def chat_skywise(
     """
     # Bu turun öneri/hafta-planı/seyahat durumu sıfırlanır; yalnızca ilgili koşulda set edilir.
     global _last_turn_recommended, _week_planner_requested, _travel_destination
+    global _recommendation_context_active
     _last_turn_recommended = False
     _week_planner_requested = False
     _travel_destination = None
@@ -770,6 +786,7 @@ def chat_skywise(
 
     if _turn_produced_recommendation(new_messages):
         _last_turn_recommended = True
+        _recommendation_context_active = True
         try:
             final_text = _supervise_chat_turn(worker_text, new_messages, messages)
         except Exception:
@@ -785,6 +802,15 @@ def chat_skywise(
         ).start()
     else:
         final_text = worker_text
+        # Follow-up turları venue_search'i her zaman yeniden çağırmaz; aracı çağırmadan
+        # önceki bağlamdan somut öneri sunulduğunda da feedback/takvim alanları (kullanıcı
+        # kapatmış olsa bile) yeniden görünmeli. Yanıt gerçekten mekan önerisi içeriyorsa
+        # (mesafe/puan/rota işaretleri) tur "öneri" sayılır; "teşekkürler" gibi yanıtlar
+        # işaret içermediği için alanlar açılmaz. Konu değişiminde (other) akış kapanır.
+        if _recommendation_context_active and _reply_offers_recommendations(worker_text):
+            _last_turn_recommended = True
+        elif intent == "other":
+            _recommendation_context_active = False
 
     # LOC etiketleri: tüm yer isimlerini çıkar, etiketleri metinden temizle
     global _last_locations
